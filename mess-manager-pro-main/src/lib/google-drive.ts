@@ -46,6 +46,13 @@ export async function uploadToGoogleDrive(
     formData.append('filename', filename);
   }
 
+  // Add minimal logging for debugging
+  console.log('Calling upload-to-drive function', { 
+    fileName: file.name, 
+    folder, 
+    functionUrl 
+  });
+
   const response = await fetch(functionUrl, {
     method: 'POST',
     headers: {
@@ -55,13 +62,17 @@ export async function uploadToGoogleDrive(
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to upload file to Google Drive');
+    const errorText = await response.text();
+    console.error('Function response error', { status: response.status, errorText });
+    throw new Error(`Upload failed: ${response.status} - ${errorText}`);
   }
 
   const result = await response.json();
   
+  console.log('Function response', { data: result });
+  
   if (!result.success) {
+    console.error('Upload error from function', { error: result.error });
     throw new Error(result.error || 'Upload failed');
   }
 

@@ -75,8 +75,6 @@ function generateJWT(): string {
   const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const encodedPayload = btoa(JSON.stringify(payload));
   
-  // Note: This is a simplified JWT. In production, you'd want to use a proper JWT library
-  // For now, we'll use a different approach with fetch to Google's OAuth endpoint
   return `${header}.${encodedPayload}.signature`;
 }
 
@@ -110,25 +108,49 @@ async function uploadToGoogleDrive(file: File, folder: string, filename?: string
   // Create folder if it doesn't exist
   const folderId = await ensureFolderExists(accessToken, folder);
   
-  // Prepare file data
-  const formData = new FormData();
-  formData.append('metadata', new Blob([JSON.stringify({
+  // Prepare file data for Google Drive API
+  const metadata = {
     name: filename || file.name,
     parents: [folderId],
-  })], { type: 'application/json' }));
+  };
+
+  // Create multipart/related request for Google Drive
+  const boundary = '-------314159265358979323846';
+  const delimiter = `--${boundary}`;
+  const closeDelimiter = `--${boundary}--`;
   
-  formData.append('file', file);
+  // Convert file to base64
+  const fileContent = await file.arrayBuffer();
+  const base64Content = btoa(String.fromCharCode(...new Uint8Array(fileContent)));
+
+  const multipartRequestBody =
+    delimiter +
+    '\r\n' +
+    'Content-Type: application/json\r\n\r\n' +
+    JSON.stringify(metadata) +
+    '\r\n' +
+    delimiter +
+    '\r\n' +
+    'Content-Type: ' + file.type + '\r\n' +
+    'Content-Transfer-Encoding: base64\r\n' +
+    '\r\n' +
+    base64Content +
+    '\r\n' +
+    closeDelimiter;
 
   const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+      'Content-Length': multipartRequestBody.length.toString(),
     },
-    body: formData,
+    body: multipartRequestBody,
   });
 
   if (!response.ok) {
-    throw new Error(`Google Drive upload failed: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Google Drive upload failed: ${response.statusText} - ${errorText}`);
   }
 
   const uploadedFile = await response.json();
@@ -183,13 +205,14 @@ async function ensureFolderExists(accessToken: string, folderPath: string): Prom
 }
 
 serve(async (req: Request) => {
+  // Enable CORS
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+
   try {
-    // Enable CORS
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    };
 
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -283,9 +306,7 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify(response), {
       status: 500,
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        ...corsHeaders,
         'Content-Type': 'application/json',
       },
     });
