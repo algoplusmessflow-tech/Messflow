@@ -80,6 +80,36 @@ export async function uploadToGoogleDrive(
 }
 
 /**
+ * Get tenant-specific folder path
+ * @param tenantId - The tenant ID
+ * @param subfolder - Optional subfolder (e.g., 'receipts', 'logos')
+ * @returns The full folder path
+ */
+export function getTenantFolder(tenantId: string, subfolder?: string): string {
+  const baseFolder = 'mess-manager';
+  const tenantFolder = `${baseFolder}/${tenantId}`;
+  return subfolder ? `${tenantFolder}/${subfolder}` : tenantFolder;
+}
+
+/**
+ * Upload a file to a tenant-specific folder
+ * @param file - The file to upload
+ * @param tenantId - The tenant ID
+ * @param subfolder - Optional subfolder (e.g., 'receipts', 'logos')
+ * @param filename - Optional filename override
+ * @returns The Google Drive upload result with public URL
+ */
+export async function uploadToTenantFolder(
+  file: File,
+  tenantId: string,
+  subfolder?: string,
+  filename?: string
+): Promise<GoogleDriveUploadResult> {
+  const folder = getTenantFolder(tenantId, subfolder);
+  return uploadToGoogleDrive(file, { folder, filename });
+}
+
+/**
  * Upload a receipt image to Google Drive
  * @param file - The receipt image file
  * @returns The public URL of the uploaded image

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useProfile } from './useProfile';
 import { toast } from 'sonner';
-import { uploadReceipt as uploadToGoogleDrive } from '@/lib/google-drive';
+import { uploadToTenantFolder } from '@/lib/google-drive';
 
 export function useStorageManager() {
   const { user } = useAuth();
@@ -35,8 +35,8 @@ export function useStorageManager() {
     if (!user) throw new Error('Not authenticated');
     
     try {
-      // Upload to Google Drive
-      const googleDriveUrl = await uploadToGoogleDrive(file);
+      // Upload to Google Drive with tenant-specific folder
+      const result = await uploadToTenantFolder(file, user.id, 'receipts', `${expenseId}_${file.name}`);
       
       // Track storage usage (for UI purposes)
       const { error: updateError } = await supabase
@@ -50,7 +50,7 @@ export function useStorageManager() {
 
       queryClient.invalidateQueries({ queryKey: ['profile'] });
 
-      return { url: googleDriveUrl, size: file.size };
+      return { url: result.url, size: file.size };
     } catch (error: any) {
       console.error('Google Drive upload failed:', error);
       throw new Error('Failed to upload receipt: ' + error.message);

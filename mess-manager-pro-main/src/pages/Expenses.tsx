@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { PettyCashWidget } from '@/components/PettyCashWidget';
 import { UploadTest } from '@/components/UploadTest';
+import { ExpenseEditDialog } from '@/components/ExpenseEditDialog';
 
 type ExpenseCategory = Database['public']['Enums']['expense_category'];
 
@@ -347,74 +348,20 @@ export default function Expenses() {
         </div>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Expense</DialogTitle>
-            </DialogHeader>
-            {editingExpense && (
-              <form onSubmit={handleEditExpense} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="editDescription">Description</Label>
-                  <Input
-                    id="editDescription"
-                    value={editingExpense.description}
-                    onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editAmount">Amount (AED)</Label>
-                  <Input
-                    id="editAmount"
-                    type="number"
-                    step="0.01"
-                    value={editingExpense.amount}
-                    onChange={(e) => setEditingExpense({ ...editingExpense, amount: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editCategory">Category</Label>
-                  <Select
-                    value={editingExpense.category}
-                    onValueChange={(value: ExpenseCategory) => setEditingExpense({ ...editingExpense, category: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPENSE_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editDate">Date</Label>
-                  <Input
-                    id="editDate"
-                    type="date"
-                    value={editingExpense.date}
-                    onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
-                    required
-                  />
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={updateExpense.isPending}>
-                    {updateExpense.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Changes
-                  </Button>
-                </DialogFooter>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
+        {editingExpense && (
+          <ExpenseEditDialog
+            expense={{
+              id: editingExpense.id,
+              description: editingExpense.description,
+              amount: parseFloat(editingExpense.amount),
+              category: editingExpense.category,
+              date: editingExpense.date,
+              receipt_url: expenses.find(e => e.id === editingExpense.id)?.receipt_url,
+            }}
+            open={isEditOpen}
+            onOpenChange={setIsEditOpen}
+          />
+        )}
 
         {/* Delete Confirmation */}
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
