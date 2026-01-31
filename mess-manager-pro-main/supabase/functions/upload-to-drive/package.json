@@ -1,0 +1,12 @@
+{
+  "name": "upload-to-drive",
+  "version": "1.0.0",
+  "description": "Supabase Edge Function to upload files to Google Drive",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

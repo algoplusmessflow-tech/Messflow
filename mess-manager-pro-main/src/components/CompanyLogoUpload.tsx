@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Upload, X, Loader2, Building } from 'lucide-react';
-import { uploadCompanyLogo } from '@/lib/cloudinary';
+import { uploadCompanyLogo } from '@/lib/google-drive';
 
 interface CompanyLogoUploadProps {
   currentLogoUrl?: string | null;
@@ -38,7 +38,7 @@ export function CompanyLogoUpload({ currentLogoUrl }: CompanyLogoUploadProps) {
 
     setUploading(true);
     try {
-      // Upload to Cloudinary (automatically compresses and optimizes)
+      // Upload to Google Drive
       const logoUrl = await uploadCompanyLogo(file);
 
       // Update profile with logo URL
@@ -67,7 +67,7 @@ export function CompanyLogoUpload({ currentLogoUrl }: CompanyLogoUploadProps) {
 
     setRemoving(true);
     try {
-      // Note: Cloudinary image remains until manually deleted via dashboard
+      // Note: Google Drive image remains until manually deleted via dashboard
       // We just clear the reference in the database
 
       // Update profile

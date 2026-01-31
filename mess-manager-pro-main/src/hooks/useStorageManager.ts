@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useProfile } from './useProfile';
 import { toast } from 'sonner';
-import { uploadReceipt as uploadToCloudinary } from '@/lib/cloudinary';
+import { uploadReceipt as uploadToGoogleDrive } from '@/lib/google-drive';
 
 export function useStorageManager() {
   const { user } = useAuth();
@@ -28,15 +28,15 @@ export function useStorageManager() {
   };
 
   /**
-   * Upload a receipt to Cloudinary
-   * Returns the secure URL of the uploaded image
+   * Upload a receipt to Google Drive
+   * Returns the public URL of the uploaded image
    */
   const uploadReceipt = async (file: File, expenseId: string): Promise<{ url: string; size: number } | null> => {
     if (!user) throw new Error('Not authenticated');
     
     try {
-      // Upload to Cloudinary
-      const cloudinaryUrl = await uploadToCloudinary(file);
+      // Upload to Google Drive
+      const googleDriveUrl = await uploadToGoogleDrive(file);
       
       // Track storage usage (for UI purposes)
       const { error: updateError } = await supabase
@@ -50,15 +50,15 @@ export function useStorageManager() {
 
       queryClient.invalidateQueries({ queryKey: ['profile'] });
 
-      return { url: cloudinaryUrl, size: file.size };
+      return { url: googleDriveUrl, size: file.size };
     } catch (error: any) {
-      console.error('Cloudinary upload failed:', error);
+      console.error('Google Drive upload failed:', error);
       throw new Error('Failed to upload receipt: ' + error.message);
     }
   };
 
   /**
-   * Note: Cloudinary deletion requires signed requests from backend
+   * Note: Google Drive deletion requires backend implementation
    * For now, we just clear the reference in the database
    */
   const deleteReceipt = async (receiptUrl: string, fileSize: number) => {
