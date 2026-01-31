@@ -20,11 +20,13 @@ import {
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { useStorageManager } from '@/hooks/useStorageManager';
 import { useCurrency } from '@/hooks/useCurrency';
+import { debugUpload } from '@/lib/debug-upload';
 import { formatDate, toDateInputValue } from '@/lib/format';
 import { Plus, Trash2, Receipt, TrendingDown, Upload, Pencil, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { PettyCashWidget } from '@/components/PettyCashWidget';
+import { UploadTest } from '@/components/UploadTest';
 
 type ExpenseCategory = Database['public']['Enums']['expense_category'];
 
@@ -271,74 +273,78 @@ export default function Expenses() {
           <PettyCashWidget />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Expenses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : expenses.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No expenses recorded yet. Add your first expense!
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {expenses.slice(0, 20).map((expense) => (
-                  <div
-                    key={expense.id}
-                    className="flex items-center justify-between p-3 bg-accent/50 border border-border rounded-lg"
-                  >
-                    <div className="flex-1 min-w-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Expenses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : expenses.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No expenses recorded yet. Add your first expense!
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {expenses.slice(0, 20).map((expense) => (
+                    <div
+                      key={expense.id}
+                      className="flex items-center justify-between p-3 bg-accent/50 border border-border rounded-lg"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate">{expense.description}</p>
+                          {expense.receipt_url && (
+                            <a 
+                              href={expense.receipt_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              <Upload className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span className="px-2 py-0.5 bg-muted rounded text-xs">
+                            {getCategoryLabel(expense.category)}
+                          </span>
+                          <span>{formatDate(new Date(expense.date))}</span>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium truncate">{expense.description}</p>
-                        {expense.receipt_url && (
-                          <a 
-                            href={expense.receipt_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            <Upload className="h-3 w-3" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="px-2 py-0.5 bg-muted rounded text-xs">
-                          {getCategoryLabel(expense.category)}
+                        <span className="font-bold text-destructive">
+                          {formatAmount(Number(expense.amount))}
                         </span>
-                        <span>{formatDate(new Date(expense.date))}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(expense)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteId(expense.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-destructive">
-                        {formatAmount(Number(expense.amount))}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(expense)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteId(expense.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <UploadTest />
+        </div>
 
         {/* Edit Dialog */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
