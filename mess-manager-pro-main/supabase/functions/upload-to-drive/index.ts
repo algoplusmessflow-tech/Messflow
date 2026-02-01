@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
+import { SignJWT, importPKCS8 } from 'https://esm.sh/jose@5.8.0';
 
 // CORS headers for all responses
 const corsHeaders = {
@@ -33,63 +34,47 @@ interface UploadResponse {
 
 // Get OAuth token from Google using service account credentials
 async function getOAuthToken(email: string, privateKeyPem: string): Promise<string> {
-  // For now, we'll use a pre-generated access token from environment variables
-  // This is a temporary solution until we implement proper JWT signing
-  const PRE_GENERATED_ACCESS_TOKEN = Deno.env.get("GDRIVE_ACCESS_TOKEN");
-  
-  if (PRE_GENERATED_ACCESS_TOKEN) {
-    console.log("Using pre-generated access token");
-    return PRE_GENERATED_ACCESS_TOKEN;
+  try {
+    // Import the private key using jose library
+    const privateKey = await importPKCS8(privateKeyPem, "RS256");
+    const now = Math.floor(Date.now() / 1000);
+
+    // Create and sign the JWT using jose library
+    const jwt = await new SignJWT({
+      iss: email,
+      scope: "https://www.googleapis.com/auth/drive.file",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+    })
+      .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+      .sign(privateKey);
+
+    // Request OAuth token from Google
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`OAuth token request failed: ${response.status} ${response.statusText} - ${body}`);
+    }
+
+    const data = await response.json();
+    if (!data.access_token) {
+      throw new Error("OAuth token response missing access_token");
+    }
+
+    return data.access_token as string;
+  } catch (error) {
+    console.error("JWT signing error:", error);
+    throw new Error(`Failed to generate OAuth token: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
-
-  // Fallback: Create a simple JWT (this will fail with Google but shows the structure)
-  const now = Math.floor(Date.now() / 1000);
-  
-  const header = {
-    alg: 'RS256',
-    typ: 'JWT'
-  };
-  
-  const payload = {
-    iss: email,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
-  };
-
-  // Base64url encoding
-  const base64urlEncode = (str: string): string => {
-    return btoa(str)
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-  };
-
-  const encodedHeader = base64urlEncode(JSON.stringify(header));
-  const encodedPayload = base64urlEncode(JSON.stringify(payload));
-  
-  // Create a JWT without proper signing (this will fail with Google)
-  const jwtAssertion = `${encodedHeader}.${encodedPayload}.unsigned`;
-  
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwtAssertion,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OAuth token request failed: ${response.statusText} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.access_token;
 }
 
 // Upload file to Google Drive
