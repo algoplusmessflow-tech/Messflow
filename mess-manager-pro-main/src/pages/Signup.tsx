@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Loader2, Eye, EyeOff, Mail, User, Shield, Building } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { useSecurityLogger } from '@/hooks/useSecurityLogger';
+import { signupWithFolderSetup } from '@/lib/tenant-setup';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
