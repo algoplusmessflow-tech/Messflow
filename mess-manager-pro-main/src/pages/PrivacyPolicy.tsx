@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
               className="flex items-center gap-3 text-gray-900 hover:text-primary transition-colors"
             >
               <ArrowLeft className="h-5 w-5" />
-              <span className="text-lg font-semibold">Back to Dashboard</span>
+              <span className="text-lg font-semibold">Back to Home</span>
             </Link>
             <div className="flex items-center gap-4">
               <Link 
@@ -153,6 +153,47 @@ export default function PrivacyPolicy() {
             </CardContent>
           </Card>
 
+          {/* Third-Party Services */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <Globe className="h-5 w-5" />
+                Third-Party Services
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                We use the following third-party services to operate our application:
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Supabase</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Database and authentication services for storing and managing your data securely.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Stripe</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Payment processing for subscription billing and transactions.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Google OAuth</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Authentication service for secure login using Google accounts.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Google Drive</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Cloud storage for receipts, documents, and file attachments.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Data Protection */}
           <Card>
             <CardHeader>
@@ -236,7 +277,7 @@ export default function PrivacyPolicy() {
                 <div>
                   <h5 className="font-semibold mb-2">Email</h5>
                   <p className="text-sm text-muted-foreground">
-                    privacy@messflow.com
+                    support@algoplusit.com
                   </p>
                 </div>
                 <div>

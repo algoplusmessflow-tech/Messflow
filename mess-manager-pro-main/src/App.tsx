@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SubscriptionGuard } from "@/components/SubscriptionGuard";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { BroadcastModal } from "@/components/BroadcastModal";
+import PublicHome from "./pages/PublicHome";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -23,7 +24,7 @@ import Renewal from "./pages/Renewal";
 import SuperAdmin from "./pages/SuperAdmin";
 import SuperAdminSecurity from "./pages/SuperAdminSecurity";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Terms from "./pages/Terms";
+import TermsOfService from "./pages/TermsOfService";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -154,8 +155,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
