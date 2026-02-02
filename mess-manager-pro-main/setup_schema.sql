@@ -474,91 +474,91 @@ ALTER TABLE public.security_logs ENABLE ROW LEVEL SECURITY;
 -- =====================================================
 
 -- User Roles Policies
-CREATE POLICY "Users can view their own roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Super admins can view all roles" ON public.user_roles FOR SELECT USING (has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Super admins can insert roles" ON public.user_roles FOR INSERT WITH CHECK (has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Super admins can delete roles" ON public.user_roles FOR DELETE USING (has_role(auth.uid(), 'super_admin'));
+CREATE POLICY "Users can view their own roles" ON public.user_roles FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Super admins can view all roles" ON public.user_roles FOR SELECT USING (has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Super admins can insert roles" ON public.user_roles FOR INSERT WITH CHECK (has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Super admins can delete roles" ON public.user_roles FOR DELETE USING (has_role((SELECT auth.uid()), 'super_admin'));
 
 -- Profiles Policies
-CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING ((SELECT auth.uid()) = user_id);
 -- Allow profile creation either by the authenticated user or by the
 -- auth.users trigger which sets `app.current_user_id` via `set_config()`
 CREATE POLICY "Users can create their own profile" ON public.profiles FOR INSERT
   WITH CHECK (
-    auth.uid() = user_id
+    (SELECT auth.uid()) = user_id
     OR (current_setting('app.current_user_id', true) IS NOT NULL AND user_id = current_setting('app.current_user_id', true)::uuid)
   );
-CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Super admins can view all profiles" ON public.profiles FOR SELECT USING (has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Super admins can update all profiles" ON public.profiles FOR UPDATE USING (has_role(auth.uid(), 'super_admin'));
+CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Super admins can view all profiles" ON public.profiles FOR SELECT USING (has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Super admins can update all profiles" ON public.profiles FOR UPDATE USING (has_role((SELECT auth.uid()), 'super_admin'));
 
 -- Members Policies (with super admin access for exports)
-CREATE POLICY "Owners can view their own members or super admin can view all" ON public.members FOR SELECT USING ((auth.uid() = owner_id) OR has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Owners can create members" ON public.members FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own members" ON public.members FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own members" ON public.members FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own members or super admin can view all" ON public.members FOR SELECT USING (((SELECT auth.uid()) = owner_id) OR has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Owners can create members" ON public.members FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own members" ON public.members FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own members" ON public.members FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Transactions Policies
-CREATE POLICY "Owners can view their own transactions" ON public.transactions FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create transactions" ON public.transactions FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own transactions" ON public.transactions FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own transactions" ON public.transactions FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own transactions" ON public.transactions FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create transactions" ON public.transactions FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own transactions" ON public.transactions FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own transactions" ON public.transactions FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Expenses Policies
-CREATE POLICY "Owners can view their own expenses" ON public.expenses FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create expenses" ON public.expenses FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own expenses" ON public.expenses FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own expenses" ON public.expenses FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own expenses" ON public.expenses FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create expenses" ON public.expenses FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own expenses" ON public.expenses FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own expenses" ON public.expenses FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Menu Policies (with super admin access for exports)
-CREATE POLICY "Owners can view their own menu or super admin can view all" ON public.menu FOR SELECT USING ((auth.uid() = owner_id) OR has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Owners can create menu items" ON public.menu FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own menu" ON public.menu FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own menu" ON public.menu FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own menu or super admin can view all" ON public.menu FOR SELECT USING (((SELECT auth.uid()) = owner_id) OR has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Owners can create menu items" ON public.menu FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own menu" ON public.menu FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own menu" ON public.menu FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Inventory Policies
-CREATE POLICY "Owners can view their own inventory" ON public.inventory FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create inventory items" ON public.inventory FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own inventory" ON public.inventory FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own inventory" ON public.inventory FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own inventory" ON public.inventory FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create inventory items" ON public.inventory FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own inventory" ON public.inventory FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own inventory" ON public.inventory FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Inventory Consumption Policies
-CREATE POLICY "Owners can view their own consumption" ON public.inventory_consumption FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create consumption records" ON public.inventory_consumption FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own consumption" ON public.inventory_consumption FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own consumption" ON public.inventory_consumption FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create consumption records" ON public.inventory_consumption FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own consumption" ON public.inventory_consumption FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Staff Policies
-CREATE POLICY "Owners can view their own staff" ON public.staff FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create staff" ON public.staff FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own staff" ON public.staff FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own staff" ON public.staff FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own staff" ON public.staff FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create staff" ON public.staff FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own staff" ON public.staff FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own staff" ON public.staff FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Staff Attendance Policies
-CREATE POLICY "Owners can view their own attendance" ON public.staff_attendance FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create attendance" ON public.staff_attendance FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own attendance" ON public.staff_attendance FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own attendance" ON public.staff_attendance FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own attendance" ON public.staff_attendance FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create attendance" ON public.staff_attendance FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own attendance" ON public.staff_attendance FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own attendance" ON public.staff_attendance FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Salary Advances Policies
-CREATE POLICY "Owners can view their own advances" ON public.salary_advances FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create advances" ON public.salary_advances FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own advances" ON public.salary_advances FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own advances" ON public.salary_advances FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create advances" ON public.salary_advances FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own advances" ON public.salary_advances FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Salary Payments Policies
-CREATE POLICY "Owners can view their own salary payments" ON public.salary_payments FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create salary payments" ON public.salary_payments FOR INSERT WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own salary payments" ON public.salary_payments FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create salary payments" ON public.salary_payments FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
 
 -- Petty Cash Policies
-CREATE POLICY "Owners can view their own petty cash" ON public.petty_cash_transactions FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create petty cash transactions" ON public.petty_cash_transactions FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own petty cash" ON public.petty_cash_transactions FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own petty cash" ON public.petty_cash_transactions FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own petty cash" ON public.petty_cash_transactions FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create petty cash transactions" ON public.petty_cash_transactions FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own petty cash" ON public.petty_cash_transactions FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own petty cash" ON public.petty_cash_transactions FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Notifications Policies
-CREATE POLICY "Owners can view their own notifications" ON public.notifications FOR SELECT USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can create notifications" ON public.notifications FOR INSERT WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Owners can update their own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = owner_id);
-CREATE POLICY "Owners can delete their own notifications" ON public.notifications FOR DELETE USING (auth.uid() = owner_id);
+CREATE POLICY "Owners can view their own notifications" ON public.notifications FOR SELECT USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can create notifications" ON public.notifications FOR INSERT WITH CHECK ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can update their own notifications" ON public.notifications FOR UPDATE USING ((SELECT auth.uid()) = owner_id);
+CREATE POLICY "Owners can delete their own notifications" ON public.notifications FOR DELETE USING ((SELECT auth.uid()) = owner_id);
 
 -- Broadcasts Policies (super admin can manage, all authenticated can read)
 CREATE POLICY "Authenticated users can read broadcasts" ON public.broadcasts FOR SELECT USING (auth.uid() IS NOT NULL);
@@ -574,15 +574,15 @@ CREATE POLICY "Super admins can create promo codes" ON public.promo_codes FOR IN
 CREATE POLICY "Super admins can delete promo codes" ON public.promo_codes FOR DELETE USING (has_role(auth.uid(), 'super_admin'));
 
 -- Promo Code Assignments Policies
-CREATE POLICY "Users can view their own assignments" ON public.promo_code_assignments FOR SELECT USING (profile_id IN (SELECT id FROM profiles WHERE user_id = auth.uid()));
-CREATE POLICY "Super admins can view all assignments" ON public.promo_code_assignments FOR SELECT USING (has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Super admins can create assignments" ON public.promo_code_assignments FOR INSERT WITH CHECK (has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Super admins can delete assignments" ON public.promo_code_assignments FOR DELETE USING (has_role(auth.uid(), 'super_admin'));
+CREATE POLICY "Users can view their own assignments" ON public.promo_code_assignments FOR SELECT USING (profile_id IN (SELECT id FROM profiles WHERE user_id = (SELECT auth.uid())));
+CREATE POLICY "Super admins can view all assignments" ON public.promo_code_assignments FOR SELECT USING (has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Super admins can create assignments" ON public.promo_code_assignments FOR INSERT WITH CHECK (has_role((SELECT auth.uid()), 'super_admin'));
+CREATE POLICY "Super admins can delete assignments" ON public.promo_code_assignments FOR DELETE USING (has_role((SELECT auth.uid()), 'super_admin'));
 
 -- Security Logs Policies
-CREATE POLICY "Users can view their own security logs" ON public.security_logs FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own security logs" ON public.security_logs FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
-CREATE POLICY "Super admins can view all security logs" ON public.security_logs FOR SELECT USING (has_role(auth.uid(), 'super_admin'));
+CREATE POLICY "Users can view their own security logs" ON public.security_logs FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Users can insert their own security logs" ON public.security_logs FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id OR user_id IS NULL);
+CREATE POLICY "Super admins can view all security logs" ON public.security_logs FOR SELECT USING (has_role((SELECT auth.uid()), 'super_admin'));
 
 -- Step 8: Storage Policies for Receipts Bucket
 -- =====================================================

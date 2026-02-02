@@ -1,5 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
+import { createClient } from '@supabase/supabase-js';
 
 // CORS headers for all responses
 const corsHeaders = {
@@ -101,7 +100,7 @@ async function ensureBaseFolder(accessToken: string, baseFolderId: string): Prom
   return baseFolderId;
 }
 
-serve(async (req: Request) => {
+export default async function handler(req: Request): Promise<Response> {
   try {
     // 1. Handle preflight first, before anything that might throw
     if (req.method === "OPTIONS") {
@@ -109,9 +108,9 @@ serve(async (req: Request) => {
     }
 
     // 2. Read env vars inside the handler, not at global scope
-    const GDRIVE_SERVICE_ACCOUNT_EMAIL = Deno.env.get("GDRIVE_SERVICE_ACCOUNT_EMAIL");
-    const GDRIVE_SERVICE_ACCOUNT_PRIVATE_KEY = Deno.env.get("GDRIVE_SERVICE_ACCOUNT_PRIVATE_KEY");
-    const GDRIVE_ROOT_FOLDER_ID = Deno.env.get("GDRIVE_ROOT_FOLDER_ID");
+    const GDRIVE_SERVICE_ACCOUNT_EMAIL = process.env.GDRIVE_SERVICE_ACCOUNT_EMAIL;
+    const GDRIVE_SERVICE_ACCOUNT_PRIVATE_KEY = process.env.GDRIVE_SERVICE_ACCOUNT_PRIVATE_KEY;
+    const GDRIVE_ROOT_FOLDER_ID = process.env.GDRIVE_ROOT_FOLDER_ID;
 
     if (!GDRIVE_SERVICE_ACCOUNT_EMAIL || !GDRIVE_SERVICE_ACCOUNT_PRIVATE_KEY || !GDRIVE_ROOT_FOLDER_ID) {
       return new Response(
@@ -137,7 +136,7 @@ serve(async (req: Request) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!);
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
     
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
@@ -223,4 +222,4 @@ serve(async (req: Request) => {
       },
     );
   }
-});
+}

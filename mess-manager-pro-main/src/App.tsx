@@ -22,6 +22,8 @@ import Settings from "./pages/Settings";
 import Renewal from "./pages/Renewal";
 import SuperAdmin from "./pages/SuperAdmin";
 import SuperAdminSecurity from "./pages/SuperAdminSecurity";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -152,6 +154,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

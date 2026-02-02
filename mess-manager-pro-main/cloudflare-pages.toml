@@ -5,6 +5,18 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Serve static pages directly
+[[redirects]]
+  from = "/privacy-policy"
+  to = "/privacy-policy/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms/index.html"
+  status = 200
+
+# Handle client-side routing for React Router (everything else)
 [[redirects]]
   from = "/*"
   to = "/index.html"

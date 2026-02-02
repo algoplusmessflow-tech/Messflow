@@ -20,14 +20,13 @@ import {
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { useStorageManager } from '@/hooks/useStorageManager';
 import { useCurrency } from '@/hooks/useCurrency';
-import { debugUpload } from '@/lib/debug-upload';
 import { formatDate, toDateInputValue } from '@/lib/format';
-import { Plus, Trash2, Receipt, TrendingDown, Upload, Pencil, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Receipt, TrendingDown, Upload, Pencil, Loader2, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { PettyCashWidget } from '@/components/PettyCashWidget';
-import { UploadTest } from '@/components/UploadTest';
 import { ExpenseEditDialog } from '@/components/ExpenseEditDialog';
+import { isMobile } from '@/lib/google-drive';
 
 type ExpenseCategory = Database['public']['Enums']['expense_category'];
 
@@ -219,6 +218,28 @@ export default function Expenses() {
                 <div className="space-y-2">
                   <Label htmlFor="receipt">Upload Receipt (Optional)</Label>
                   <div className="flex items-center gap-2">
+                    {/* Mobile: Camera capture */}
+                    {isMobile() && (
+                      <>
+                        <Input
+                          id="receipt-camera"
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="receipt-camera"
+                          className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 cursor-pointer mr-2"
+                        >
+                          <Camera className="h-3 w-3 mr-1" />
+                          Take Photo
+                        </label>
+                      </>
+                    )}
+                    
+                    {/* Desktop: File picker */}
                     <Input
                       id="receipt"
                       type="file"
@@ -343,8 +364,6 @@ export default function Expenses() {
               )}
             </CardContent>
           </Card>
-
-          <UploadTest />
         </div>
 
         {/* Edit Dialog */}

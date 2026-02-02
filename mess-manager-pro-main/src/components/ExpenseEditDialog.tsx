@@ -8,8 +8,9 @@ import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { useStorageManager } from '@/hooks/useStorageManager';
 import { toast } from 'sonner';
 import { formatDate, toDateInputValue } from '@/lib/format';
-import { Pencil, Trash2, Upload, Loader2, Image as ImageIcon, X } from 'lucide-react';
+import { Pencil, Trash2, Upload, Loader2, Image as ImageIcon, X, Camera } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import { isMobile } from '@/lib/google-drive';
 
 type ExpenseCategory = Database['public']['Enums']['expense_category'];
 
@@ -228,6 +229,29 @@ export function ExpenseEditDialog({ expense, open, onOpenChange }: ExpenseEditDi
                   <p className="text-sm text-muted-foreground mb-2">
                     {receiptFile ? receiptFile.name : 'Upload new receipt (optional)'}
                   </p>
+                  
+                  {/* Mobile: Camera capture button */}
+                  {isMobile() && (
+                    <>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                        id="receipt-camera"
+                      />
+                      <label
+                        htmlFor="receipt-camera"
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-md hover:bg-primary/20 cursor-pointer mr-2"
+                      >
+                        <Camera className="h-3 w-3 mr-1" />
+                        Take Photo
+                      </label>
+                    </>
+                  )}
+                  
+                  {/* Desktop: File picker */}
                   <Input
                     type="file"
                     accept="image/*,.pdf"

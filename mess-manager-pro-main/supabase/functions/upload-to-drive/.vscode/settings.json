@@ -1,0 +1,13 @@
+{
+  "deno.enable": true,
+  "deno.lint": false,
+  "deno.unstable": false,
+  "typescript.validate.enable": false,
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "typescript.suggest.autoImports": false,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.codeActionsOnSave": {
+    "source.fixAll": false
+  },
+  "cSpell.enabled": false
+}

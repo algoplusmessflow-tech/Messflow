@@ -16,6 +16,13 @@ export interface GoogleDriveUploadOptions {
 }
 
 /**
+ * Check if the current device is mobile
+ */
+export function isMobile(): boolean {
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/**
  * Upload a file to Google Drive via Supabase Edge Function
  * @param file - The file to upload
  * @param options - Upload options (folder, filename)
@@ -25,18 +32,11 @@ export async function uploadToGoogleDrive(
   file: File,
   options: GoogleDriveUploadOptions = {}
 ): Promise<GoogleDriveUploadResult> {
-  const { folder = 'mess-manager', filename } = options;
+  const { folder = 'receipts', filename } = options;
 
-  // Get the Supabase Edge Function URL
-  const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-to-drive`;
-
-  // Get the current user's auth token
+  // Get the current user's auth session
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-
-  if (!token) {
-    throw new Error('Authentication required');
-  }
+  if (!session) throw new Error('Not authenticated');
 
   // Create FormData for the file upload
   const formData = new FormData();
@@ -46,67 +46,16 @@ export async function uploadToGoogleDrive(
     formData.append('filename', filename);
   }
 
-  // Add minimal logging for debugging
-  console.log('Calling upload-to-drive function', { 
-    fileName: file.name, 
-    folder, 
-    functionUrl 
-  });
-
-  const response = await fetch(functionUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+  // Use supabase.functions.invoke instead of manual fetch
+  const { data, error } = await supabase.functions.invoke('upload-to-drive', {
     body: formData,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Function response error', { status: response.status, errorText });
-    throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+  if (error || !data?.success) {
+    throw new Error(data?.error ?? error.message);
   }
 
-  const result = await response.json();
-  
-  console.log('Function response', { data: result });
-  
-  if (!result.success) {
-    console.error('Upload error from function', { error: result.error });
-    throw new Error(result.error || 'Upload failed');
-  }
-
-  return result.data;
-}
-
-/**
- * Get tenant-specific folder path
- * @param tenantId - The tenant ID
- * @param subfolder - Optional subfolder (e.g., 'receipts', 'logos')
- * @returns The full folder path
- */
-export function getTenantFolder(tenantId: string, subfolder?: string): string {
-  const baseFolder = 'mess-manager';
-  const tenantFolder = `${baseFolder}/${tenantId}`;
-  return subfolder ? `${tenantFolder}/${subfolder}` : tenantFolder;
-}
-
-/**
- * Upload a file to a tenant-specific folder
- * @param file - The file to upload
- * @param tenantId - The tenant ID
- * @param subfolder - Optional subfolder (e.g., 'receipts', 'logos')
- * @param filename - Optional filename override
- * @returns The Google Drive upload result with public URL
- */
-export async function uploadToTenantFolder(
-  file: File,
-  tenantId: string,
-  subfolder?: string,
-  filename?: string
-): Promise<GoogleDriveUploadResult> {
-  const folder = getTenantFolder(tenantId, subfolder);
-  return uploadToGoogleDrive(file, { folder, filename });
+  return data.data;
 }
 
 /**
@@ -116,7 +65,7 @@ export async function uploadToTenantFolder(
  */
 export async function uploadReceipt(file: File): Promise<string> {
   const result = await uploadToGoogleDrive(file, {
-    folder: 'mess-manager/receipts',
+    folder: 'receipts',
   });
   return result.url;
 }
@@ -128,7 +77,7 @@ export async function uploadReceipt(file: File): Promise<string> {
  */
 export async function uploadCompanyLogo(file: File): Promise<string> {
   const result = await uploadToGoogleDrive(file, {
-    folder: 'mess-manager/logos',
+    folder: 'logos',
   });
   return result.url;
 }
@@ -140,7 +89,7 @@ export async function uploadCompanyLogo(file: File): Promise<string> {
  */
 export async function uploadAvatar(file: File): Promise<string> {
   const result = await uploadToGoogleDrive(file, {
-    folder: 'mess-manager/avatars',
+    folder: 'avatars',
   });
   return result.url;
 }
