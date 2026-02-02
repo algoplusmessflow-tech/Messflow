@@ -1,6 +1,2 @@
-# Serve static pages directly
-/privacy-policy /privacy-policy/index.html 200
-/terms /terms/index.html 200
-
-# Handle client-side routing for React Router (everything else)
+# Handle client-side routing for React Router
 /* /index.html 200
