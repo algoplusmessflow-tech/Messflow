@@ -8,6 +8,10 @@
     "/favicon.png",
     "/robots.txt",
     "/assets/*",
-    "/static/*"
+    "/static/*",
+    "/privacy-policy",
+    "/privacy-policy/*",
+    "/terms",
+    "/terms/*"
   ]
 }
