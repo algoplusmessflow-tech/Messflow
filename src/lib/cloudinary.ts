@@ -52,14 +52,9 @@ export async function uploadToCloudinary(
   formData.append('upload_preset', uploadPreset);
   formData.append('folder', folder);
   
-  // Apply transformations for optimization
-  formData.append('transformation', JSON.stringify({
-    width: maxWidth,
-    height: maxHeight,
-    crop: 'limit',
-    quality: 'auto',
-    fetch_format: 'auto'
-  }));
+  // Apply transformations for optimization (Cloudinary format: w_1200,h_1200,c_limit,q_auto,f_auto)
+  const transformation = `w_${maxWidth},h_${maxHeight},c_limit,q_auto,f_auto`;
+  formData.append('transformation', transformation);
 
   const response = await fetch(
     `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
