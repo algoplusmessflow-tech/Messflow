@@ -1,0 +1,12 @@
+{
+  "name": "create-tenant-folders",
+  "version": "1.0.0",
+  "description": "Create Google Drive folders for new tenants",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}
