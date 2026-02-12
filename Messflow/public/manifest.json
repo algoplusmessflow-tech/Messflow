@@ -1,0 +1,24 @@
+{
+  "name": "MessFlow",
+  "short_name": "MessFlow",
+  "description": "The all-in-one food mess and canteen management system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F0F0F",
+  "theme_color": "#0F0F0F",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
