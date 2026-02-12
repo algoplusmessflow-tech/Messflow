@@ -10,7 +10,7 @@ const getCloudinaryConfig = () => {
   // Try VITE_ prefixed first (for local dev and client-side)
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
-  
+
   return { cloudName, uploadPreset };
 };
 
@@ -40,26 +40,23 @@ export async function uploadToCloudinary(
   options: CloudinaryUploadOptions = {}
 ): Promise<CloudinaryUploadResult> {
   const { cloudName, uploadPreset } = getCloudinaryConfig();
-  
+
+  console.log('Cloudinary Config Debug:', {
+    cloudName: cloudName ? 'Set' : 'Missing',
+    uploadPreset: uploadPreset ? 'Set' : 'Missing'
+  });
+
   if (!cloudName || !uploadPreset) {
+    console.error('Cloudinary config missing:', { cloudName, uploadPreset });
     throw new Error('Cloudinary credentials not configured. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to your environment.');
   }
 
-  const { folder = 'mess-manager', maxWidth = 1200, maxHeight = 1200 } = options;
+  const { folder = 'mess-manager' } = options;
 
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', uploadPreset);
   formData.append('folder', folder);
-  
-  // Apply transformations for optimization
-  formData.append('transformation', JSON.stringify({
-    width: maxWidth,
-    height: maxHeight,
-    crop: 'limit',
-    quality: 'auto',
-    fetch_format: 'auto'
-  }));
 
   const response = await fetch(
     `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
@@ -129,7 +126,7 @@ export function getPublicIdFromUrl(url: string): string | null {
     const pathParts = urlObj.pathname.split('/');
     const uploadIndex = pathParts.indexOf('upload');
     if (uploadIndex === -1) return null;
-    
+
     // Get everything after 'upload/v{version}/'
     const relevantParts = pathParts.slice(uploadIndex + 2);
     const publicId = relevantParts.join('/').replace(/\.[^/.]+$/, ''); // Remove extension

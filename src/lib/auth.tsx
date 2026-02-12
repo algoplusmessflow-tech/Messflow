@@ -22,22 +22,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         // Handle token refresh
         if (event === 'TOKEN_REFRESHED') {
-          setSession(session);
-          setUser(session?.user ?? null);
+          console.log('Token refreshed successfully');
         }
-        
+
         // Handle signed out
         if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
         }
-        
+
         // Handle signed in
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
           setSession(session);
           setUser(session?.user ?? null);
         }
-        
+
         setLoading(false);
       }
     );

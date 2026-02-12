@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
 
@@ -9,8 +10,9 @@ interface Profile {
   user_id: string;
   business_name: string;
   owner_email: string;
-  subscription_status: string;
+  subscription_status: 'active' | 'expired' | 'trial';
   subscription_expiry: string | null;
+  plan_type: 'free' | 'pro' | 'enterprise'; // Added plan_type
   payment_link: string | null;
   storage_used: number;
   storage_limit: number;
@@ -22,7 +24,13 @@ interface Profile {
   created_at: string;
   updated_at: string;
   member_count?: number;
+  is_platform_gateway_enabled?: boolean;
+  platform_gateway_config?: any;
 }
+
+// ... (rest of the file until updateSubscription)
+
+
 
 interface MemberData {
   id: string;
@@ -94,7 +102,10 @@ interface SuperAdminUser {
 
 export function useSuperAdmin() {
   const { isSuperAdmin } = useUserRole();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+
+
 
   // Fetch all profiles (owners) with member counts
   const { data: allProfiles = [], isLoading: profilesLoading } = useQuery({
@@ -104,7 +115,7 @@ export function useSuperAdmin() {
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
 
       // Get member counts for each profile
@@ -114,7 +125,7 @@ export function useSuperAdmin() {
             .from('members')
             .select('*', { count: 'exact', head: true })
             .eq('owner_id', profile.user_id);
-          
+
           return {
             ...profile,
             member_count: count || 0,
@@ -130,7 +141,7 @@ export function useSuperAdmin() {
             .select('role')
             .eq('user_id', profile.user_id)
             .single();
-          
+
           return {
             ...profile,
             isSuperAdmin: userRole?.role === 'super_admin',
@@ -177,7 +188,7 @@ export function useSuperAdmin() {
         .from('promo_codes')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as PromoCode[];
     },
@@ -192,7 +203,7 @@ export function useSuperAdmin() {
         .from('promo_code_assignments')
         .select('*, profile:profiles(business_name, owner_email)')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as PromoCodeAssignment[];
     },
@@ -208,9 +219,9 @@ export function useSuperAdmin() {
         .select('*')
         .eq('role', 'super_admin')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       // Get emails from profiles
       const superAdminData = await Promise.all(
         (data as SuperAdminUser[]).map(async (admin) => {
@@ -219,14 +230,14 @@ export function useSuperAdmin() {
             .select('owner_email')
             .eq('user_id', admin.user_id)
             .single();
-          
+
           return {
             ...admin,
             email: profile?.owner_email || 'Unknown',
           };
         })
       );
-      
+
       return superAdminData;
     },
     enabled: isSuperAdmin,
@@ -278,7 +289,7 @@ export function useSuperAdmin() {
       .eq('owner_id', ownerId)
       .order('week_number', { ascending: true })
       .order('day', { ascending: true });
-    
+
     if (error) throw error;
     return data as MenuData[];
   };
@@ -290,19 +301,19 @@ export function useSuperAdmin() {
       .select('*')
       .eq('owner_id', ownerId)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
 
     // Fetch menu data for this owner
     const menuData = await fetchMenuForOwner(ownerId);
-    
+
     // Attach menu details to each member based on their selected_menu_week
     const membersWithMenu: MemberWithMenuData[] = (members as MemberData[]).map(member => {
       const selectedWeek = member.selected_menu_week || 1;
       const weekMenu = menuData.filter(m => m.week_number === selectedWeek);
-      
+
       const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const sortedWeekMenu = weekMenu.sort((a, b) => 
+      const sortedWeekMenu = weekMenu.sort((a, b) =>
         dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day)
       );
 
@@ -325,21 +336,32 @@ export function useSuperAdmin() {
 
   // Update owner's subscription
   const updateSubscription = useMutation({
-    mutationFn: async ({ 
-      profileId, 
-      status, 
-      expiryDate 
-    }: { 
-      profileId: string; 
-      status: 'active' | 'expired' | 'trial'; 
+    mutationFn: async ({
+      profileId,
+      status,
+      expiryDate,
+      planType
+    }: {
+      profileId: string;
+      status: 'active' | 'expired' | 'trial';
       expiryDate: string;
+      planType?: 'free' | 'pro' | 'enterprise';
     }) => {
+      const updates: any = {
+        subscription_status: status,
+        subscription_expiry: expiryDate,
+      };
+
+      if (planType) {
+        updates.plan_type = planType;
+        if (planType === 'free') updates.storage_limit = 104857600; // 100MB
+        if (planType === 'pro') updates.storage_limit = 10737418240; // 10GB
+        if (planType === 'enterprise') updates.storage_limit = 1099511627776; // 1TB
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({ 
-          subscription_status: status,
-          subscription_expiry: expiryDate,
-        })
+        .update(updates)
         .eq('id', profileId);
 
       if (error) throw error;
@@ -520,6 +542,55 @@ export function useSuperAdmin() {
     },
   });
 
+
+
+  // Fetch current super admin profile for settings
+  const { data: currentSuperAdminProfile } = useQuery({
+    queryKey: ['current-super-admin-profile', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data as Profile;
+    },
+    enabled: !!user && isSuperAdmin,
+  });
+
+  // Update gateway settings
+  const updateGatewaySettings = useMutation({
+    mutationFn: async ({
+      isEnabled,
+      config
+    }: {
+      isEnabled: boolean;
+      config: any
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_platform_gateway_enabled: isEnabled,
+          platform_gateway_config: config
+        } as any) // Cast as any since types might not be updated
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-super-admin-profile'] });
+      toast.success('Gateway settings updated!');
+    },
+    onError: (error) => {
+      toast.error('Failed to update gateway settings: ' + error.message);
+    },
+  });
+
   return {
     isSuperAdmin,
     allProfiles,
@@ -541,5 +612,7 @@ export function useSuperAdmin() {
     addSuperAdmin,
     removeSuperAdmin,
     fetchMembersForOwner,
+    currentSuperAdminProfile,
+    updateGatewaySettings,
   };
 }

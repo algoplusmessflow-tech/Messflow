@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { SuperAdminLayout } from '@/components/SuperAdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,18 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -15,7 +27,7 @@ import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useBroadcasts } from '@/hooks/useBroadcasts';
 import { formatDate } from '@/lib/format';
-import { Users, Megaphone, Gift, Loader2, Plus, Trash2, CheckCircle, XCircle, Link as LinkIcon, UserPlus, AlertTriangle, HardDrive, Shield, CreditCard, UserCheck, ShieldAlert, Download, Edit2, UsersRound, FileSpreadsheet, Search } from 'lucide-react';
+import { Users, Megaphone, Gift, Loader2, Plus, Trash2, CheckCircle, XCircle, Link as LinkIcon, UserPlus, AlertTriangle, HardDrive, Shield, CreditCard, UserCheck, ShieldAlert, Download, Edit2, UsersRound, FileSpreadsheet, Search, BarChart3, Activity, Cloud, Database, Image as ImageIcon, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -29,12 +41,12 @@ const formatBytes = (bytes: number): string => {
 
 export default function SuperAdmin() {
   const { isSuperAdmin, isLoading: roleLoading } = useUserRole();
-  const { 
-    allProfiles, 
-    promoCodes, 
+  const {
+    allProfiles,
+    promoCodes,
     promoAssignments,
     superAdmins,
-    profilesLoading, 
+    profilesLoading,
     promoLoading,
     assignmentsLoading,
     superAdminsLoading,
@@ -49,8 +61,36 @@ export default function SuperAdmin() {
     addSuperAdmin,
     removeSuperAdmin,
     fetchMembersForOwner,
+    currentSuperAdminProfile,
+    updateGatewaySettings,
   } = useSuperAdmin();
-  
+
+  const [gatewayConfig, setGatewayConfig] = useState({
+    provider: 'razorpay',
+    apiKey: '',
+    secretKey: '',
+  });
+  const [isGatewayEnabled, setIsGatewayEnabled] = useState(false);
+
+  // Load existing settings
+  useEffect(() => {
+    if (currentSuperAdminProfile) {
+      if (currentSuperAdminProfile.is_platform_gateway_enabled !== undefined) {
+        setIsGatewayEnabled(currentSuperAdminProfile.is_platform_gateway_enabled);
+      }
+      if (currentSuperAdminProfile.platform_gateway_config) {
+        setGatewayConfig(currentSuperAdminProfile.platform_gateway_config);
+      }
+    }
+  }, [currentSuperAdminProfile]);
+
+  const handleSaveGatewayConfig = async () => {
+    await updateGatewaySettings.mutateAsync({
+      isEnabled: isGatewayEnabled,
+      config: gatewayConfig,
+    });
+  };
+
   const { createBroadcast, allBroadcasts } = useBroadcasts();
 
   const [editingPaymentLink, setEditingPaymentLink] = useState<string | null>(null);
@@ -68,6 +108,137 @@ export default function SuperAdmin() {
   const [newBusinessName, setNewBusinessName] = useState('');
   const [exportingOwner, setExportingOwner] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletePromoId, setDeletePromoId] = useState<string | null>(null);
+  const [removeAdminId, setRemoveAdminId] = useState<string | null>(null);
+
+  // Subscription editing state
+  const [editingSubscription, setEditingSubscription] = useState<string | null>(null);
+  const [editSubForm, setEditSubForm] = useState({
+    status: 'active' as 'active' | 'expired' | 'trial',
+    planType: 'free' as 'free' | 'pro' | 'enterprise',
+    expiryDate: new Date(),
+  });
+
+  const handleEditSubscription = (profile: typeof allProfiles[0]) => {
+    setEditingSubscription(profile.id);
+    setEditSubForm({
+      status: profile.subscription_status as any,
+      planType: profile.plan_type as any || 'free',
+      expiryDate: profile.subscription_expiry ? new Date(profile.subscription_expiry) : new Date(),
+    });
+  };
+
+  const handleSaveSubscription = async () => {
+    if (!editingSubscription) return;
+    await updateSubscription.mutateAsync({
+      profileId: editingSubscription,
+      status: editSubForm.status,
+      planType: editSubForm.planType,
+      expiryDate: editSubForm.expiryDate.toISOString(),
+    });
+    setEditingSubscription(null);
+  };
+
+  // ===== ANALYTICS DATA =====
+  // Supabase free tier limits
+  const SUPABASE_FREE = {
+    database: 500 * 1024 * 1024,       // 500MB
+    fileStorage: 1024 * 1024 * 1024,    // 1GB  
+    bandwidth: 2 * 1024 * 1024 * 1024,  // 2GB
+    authUsers: 50000,                    // 50K MAU
+    realtimeConnections: 200,            // 200 concurrent
+    edgeFunctionInvocations: 500000,     // 500K/month
+  };
+
+  // Cloudinary free tier limits  
+  const CLOUDINARY_FREE = {
+    totalCredits: 25,                    // 25 credits/month
+    storage: 25 * 1024 * 1024 * 1024,   // 25GB managed storage
+    transformations: 25000,              // ~25K transformations
+    bandwidth: 25 * 1024 * 1024 * 1024, // 25GB bandwidth
+  };
+
+  const analytics = useMemo(() => {
+    if (!allProfiles.length) return null;
+
+    const totalTenants = allProfiles.length;
+    const activeTenants = allProfiles.filter(p => p.subscription_status === 'active').length;
+    const expiredTenants = allProfiles.filter(p => p.subscription_status === 'expired').length;
+    const trialTenants = allProfiles.filter(p => p.subscription_status === 'trial').length;
+    const totalMembers = allProfiles.reduce((sum, p) => sum + (p.member_count || 0), 0);
+    const totalStorageUsed = allProfiles.reduce((sum, p) => sum + (p.storage_used || 0), 0);
+    const totalStorageAllocated = allProfiles.reduce((sum, p) => sum + (p.storage_limit || 0), 0);
+
+    const freePlanCount = allProfiles.filter(p => p.plan_type === 'free').length;
+    const proPlanCount = allProfiles.filter(p => p.plan_type === 'pro').length;
+    const enterprisePlanCount = allProfiles.filter(p => p.plan_type === 'enterprise').length;
+
+    const topByMembers = [...allProfiles]
+      .sort((a, b) => (b.member_count || 0) - (a.member_count || 0))
+      .slice(0, 5);
+
+    const topByStorage = [...allProfiles]
+      .sort((a, b) => (b.storage_used || 0) - (a.storage_used || 0))
+      .slice(0, 5);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentSignups = allProfiles.filter(
+      p => new Date(p.created_at) >= sevenDaysAgo
+    ).length;
+
+    return {
+      totalTenants, activeTenants, expiredTenants, trialTenants,
+      totalMembers, totalStorageUsed, totalStorageAllocated,
+      freePlanCount, proPlanCount, enterprisePlanCount,
+      topByMembers, topByStorage, recentSignups,
+    };
+  }, [allProfiles]);
+
+  // Helper: Progress bar component
+  const UsageBar = ({ used, limit, label, icon: Icon, unit = 'bytes', warning = 0.7, danger = 0.9 }: {
+    used: number; limit: number; label: string; icon: any; unit?: string; warning?: number; danger?: number;
+  }) => {
+    const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
+    const color = pct >= danger * 100 ? 'bg-red-500' : pct >= warning * 100 ? 'bg-amber-500' : 'bg-emerald-500';
+    const textColor = pct >= danger * 100 ? 'text-red-400' : pct >= warning * 100 ? 'text-amber-400' : 'text-emerald-400';
+
+    const formatVal = (v: number) => {
+      if (unit === 'count') return v.toLocaleString();
+      return formatBytes(v);
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Icon className="h-4 w-4" />
+            {label}
+          </span>
+          <span className={`font-mono font-medium ${textColor}`}>
+            {formatVal(used)} / {formatVal(limit)}
+          </span>
+        </div>
+        <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${color}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>{pct.toFixed(1)}% used</span>
+          {pct >= danger * 100 && (
+            <span className="text-red-400 font-medium flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" /> Upgrade soon!
+            </span>
+          )}
+          {pct >= warning * 100 && pct < danger * 100 && (
+            <span className="text-amber-400 font-medium">Approaching limit</span>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   if (roleLoading) {
     return (
@@ -159,8 +330,8 @@ export default function SuperAdmin() {
   };
 
   const toggleProfileSelection = (profileId: string) => {
-    setSelectedProfileIds(prev => 
-      prev.includes(profileId) 
+    setSelectedProfileIds(prev =>
+      prev.includes(profileId)
         ? prev.filter(id => id !== profileId)
         : [...prev, profileId]
     );
@@ -180,7 +351,7 @@ export default function SuperAdmin() {
     try {
       setExportingOwner(profile.id);
       const members = await fetchMembersForOwner(profile.user_id);
-      
+
       if (members.length === 0) {
         toast.error('No members found for this owner');
         return;
@@ -262,10 +433,10 @@ export default function SuperAdmin() {
       // Generate filename with current month
       const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
       const fileName = `${profile.business_name.replace(/[^a-zA-Z0-9]/g, '_')}_members_menu_${currentMonth.replace(' ', '_')}.xlsx`;
-      
+
       // Write and download
       XLSX.writeFile(workbook, fileName);
-      
+
       toast.success(`Exported ${members.length} members with menu details to Excel`);
     } catch (error: any) {
       toast.error('Failed to export: ' + error.message);
@@ -452,7 +623,11 @@ export default function SuperAdmin() {
         )}
 
         <Tabs defaultValue="tenants" className="w-full">
-          <TabsList>
+          <TabsList className="flex flex-wrap">
+            <TabsTrigger value="analytics">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="tenants">
               <Users className="h-4 w-4 mr-2" />
               Tenants
@@ -474,6 +649,204 @@ export default function SuperAdmin() {
               Admins
             </TabsTrigger>
           </TabsList>
+
+          {/* ===== ANALYTICS TAB ===== */}
+          <TabsContent value="analytics" className="mt-4 space-y-6">
+            {!analytics ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                {/* Overview Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-3xl font-bold text-primary">{analytics.totalTenants}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Total Tenants</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-3xl font-bold text-emerald-400">{analytics.activeTenants}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Active</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-3xl font-bold text-blue-400">{analytics.totalMembers}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Total Members</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-3xl font-bold text-amber-400">{analytics.recentSignups}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Signups (7d)</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Free Tier Usage */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Supabase Usage */}
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Database className="h-5 w-5 text-emerald-400" />
+                        Supabase Free Tier
+                        <span className="text-xs font-normal text-muted-foreground ml-auto">Free Plan</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <UsageBar
+                        used={analytics.totalStorageUsed}
+                        limit={SUPABASE_FREE.fileStorage}
+                        label="File Storage"
+                        icon={HardDrive}
+                      />
+                      <UsageBar
+                        used={analytics.totalTenants}
+                        limit={SUPABASE_FREE.authUsers}
+                        label="Auth Users"
+                        icon={Users}
+                        unit="count"
+                      />
+                      <UsageBar
+                        used={analytics.totalMembers + analytics.totalTenants}
+                        limit={500000}
+                        label="Est. Database Rows"
+                        icon={Database}
+                        unit="count"
+                      />
+                      <div className="pt-2 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">Free Tier Limits:</span>{' '}
+                          500MB DB • 1GB Storage • 50K Auth Users • 2GB Bandwidth
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Cloudinary Usage */}
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Cloud className="h-5 w-5 text-blue-400" />
+                        Cloudinary Free Tier
+                        <span className="text-xs font-normal text-muted-foreground ml-auto">Free Plan</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <UsageBar
+                        used={analytics.totalStorageUsed}
+                        limit={CLOUDINARY_FREE.storage}
+                        label="Managed Storage"
+                        icon={ImageIcon}
+                      />
+                      <UsageBar
+                        used={analytics.totalTenants * 50}
+                        limit={CLOUDINARY_FREE.transformations}
+                        label="Est. Transformations"
+                        icon={Zap}
+                        unit="count"
+                      />
+                      <div className="pt-2 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">Free Tier Limits:</span>{' '}
+                          25 Credits/mo • 25GB Storage • 25K Transforms • 25GB Bandwidth
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Plan Distribution & Top Tenants */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Plan Distribution */}
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-purple-400" />
+                        Plan Distribution
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {[
+                        { label: 'Free', count: analytics.freePlanCount, color: 'bg-gray-400', pct: (analytics.freePlanCount / analytics.totalTenants * 100) },
+                        { label: 'Pro', count: analytics.proPlanCount, color: 'bg-blue-500', pct: (analytics.proPlanCount / analytics.totalTenants * 100) },
+                        { label: 'Enterprise', count: analytics.enterprisePlanCount, color: 'bg-purple-500', pct: (analytics.enterprisePlanCount / analytics.totalTenants * 100) },
+                      ].map(plan => (
+                        <div key={plan.label} className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{plan.label}</span>
+                            <span className="font-medium">{plan.count} ({plan.pct.toFixed(0)}%)</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <div className={`h-full rounded-full ${plan.color}`} style={{ width: `${plan.pct}%` }} />
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className="pt-3 border-t border-border space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Status Breakdown</span>
+                        </div>
+                        <div className="flex gap-4 text-xs">
+                          <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-emerald-400" /> Active: {analytics.activeTenants}</span>
+                          <span className="flex items-center gap-1"><XCircle className="h-3 w-3 text-red-400" /> Expired: {analytics.expiredTenants}</span>
+                          <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-amber-400" /> Trial: {analytics.trialTenants}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Top Tenants */}
+                  <Card className="backdrop-blur-xl border-border bg-card/80">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <UsersRound className="h-5 w-5 text-amber-400" />
+                        Top Tenants
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Tabs defaultValue="by-members">
+                        <TabsList className="w-full mb-3">
+                          <TabsTrigger value="by-members" className="flex-1 text-xs">By Members</TabsTrigger>
+                          <TabsTrigger value="by-storage" className="flex-1 text-xs">By Storage</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="by-members">
+                          <div className="space-y-2">
+                            {analytics.topByMembers.map((p, i) => (
+                              <div key={p.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                                  <span className="truncate max-w-[150px]">{p.business_name || p.owner_email}</span>
+                                </span>
+                                <span className="font-mono text-muted-foreground">{p.member_count} members</span>
+                              </div>
+                            ))}
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="by-storage">
+                          <div className="space-y-2">
+                            {analytics.topByStorage.map((p, i) => (
+                              <div key={p.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30">
+                                <span className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                                  <span className="truncate max-w-[150px]">{p.business_name || p.owner_email}</span>
+                                </span>
+                                <span className="font-mono text-muted-foreground">{formatBytes(p.storage_used || 0)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            )}
+          </TabsContent>
 
           <TabsContent value="tenants" className="mt-4">
             <Card className="backdrop-blur-xl border-border bg-card/80 hover:shadow-lg hover:shadow-glass transition-all duration-300">
@@ -503,6 +876,7 @@ export default function SuperAdmin() {
                         <TableRow>
                           <TableHead className="font-semibold text-muted-foreground">Mess Name</TableHead>
                           <TableHead className="font-semibold text-muted-foreground">Owner Email</TableHead>
+                          <TableHead className="font-semibold text-muted-foreground">Plan</TableHead>
                           <TableHead className="font-semibold text-muted-foreground">Members</TableHead>
                           <TableHead className="font-semibold text-muted-foreground">Signup Date</TableHead>
                           <TableHead className="font-semibold text-muted-foreground">Payment</TableHead>
@@ -518,8 +892,8 @@ export default function SuperAdmin() {
                             <TableCell className="font-medium text-foreground">
                               <div className="flex items-center gap-2">
                                 {profile.business_name}
-                                <Dialog 
-                                  open={editingBusinessName === profile.id} 
+                                <Dialog
+                                  open={editingBusinessName === profile.id}
                                   onOpenChange={(open) => {
                                     if (!open) setEditingBusinessName(null);
                                     else {
@@ -545,8 +919,8 @@ export default function SuperAdmin() {
                                         placeholder="Business Name"
                                         className="border-border focus:border-border focus:ring-border"
                                       />
-                                      <Button 
-                                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold" 
+                                      <Button
+                                        className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold"
                                         onClick={() => handleSaveBusinessName(profile.id)}
                                         disabled={updateBusinessName.isPending}
                                       >
@@ -560,6 +934,11 @@ export default function SuperAdmin() {
                             </TableCell>
                             <TableCell className="text-muted-foreground">{profile.owner_email}</TableCell>
                             <TableCell>
+                              <Badge variant="outline" className="uppercase text-xs font-bold">
+                                {profile.plan_type || 'free'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
                               <Badge variant="secondary" className="font-mono bg-background/50 text-foreground border-border">
                                 {profile.member_count || 0}
                               </Badge>
@@ -570,9 +949,9 @@ export default function SuperAdmin() {
                                 size="sm"
                                 variant={profile.is_paid ? 'default' : 'outline'}
                                 className={`${profile.is_paid ? 'bg-green-500 hover:bg-green-600 text-white' : 'border-border text-foreground hover:bg-background/50'} font-medium`}
-                                onClick={() => togglePaymentStatus.mutate({ 
-                                  profileId: profile.id, 
-                                  isPaid: !profile.is_paid 
+                                onClick={() => togglePaymentStatus.mutate({
+                                  profileId: profile.id,
+                                  isPaid: !profile.is_paid
                                 })}
                                 disabled={togglePaymentStatus.isPending}
                               >
@@ -581,20 +960,20 @@ export default function SuperAdmin() {
                               </Button>
                             </TableCell>
                             <TableCell>
-                              <Badge 
+                              <Badge
                                 variant={
-                                  profile.subscription_status === 'active' ? 'default' : 
-                                  profile.subscription_status === 'trial' ? 'secondary' : 'destructive'
+                                  profile.subscription_status === 'active' ? 'default' :
+                                    profile.subscription_status === 'trial' ? 'secondary' : 'destructive'
                                 }
-                                className={`${profile.subscription_status === 'active' ? 'bg-green-100 text-green-800 border-green-200' : 
-                                  profile.subscription_status === 'trial' ? 'bg-blue-100 text-blue-800 border-blue-200' : 
-                                  'bg-red-100 text-red-800 border-red-200'} font-medium`}
+                                className={`${profile.subscription_status === 'active' ? 'bg-green-100 text-green-800 border-green-200' :
+                                  profile.subscription_status === 'trial' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                    'bg-red-100 text-red-800 border-red-200'} font-medium`}
                               >
                                 {profile.subscription_status}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {profile.subscription_expiry 
+                              {profile.subscription_expiry
                                 ? formatDate(new Date(profile.subscription_expiry))
                                 : '—'}
                             </TableCell>
@@ -608,6 +987,15 @@ export default function SuperAdmin() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditSubscription(profile)}
+                                  title="Edit Subscription"
+                                  className="hover:bg-background/50"
+                                >
+                                  <Edit2 className="h-4 w-4 text-muted-foreground" />
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -652,6 +1040,48 @@ export default function SuperAdmin() {
                 )}
               </CardContent>
             </Card>
+            <Dialog open={!!editingSubscription} onOpenChange={(open) => !open && setEditingSubscription(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Subscription</DialogTitle>
+                  <DialogDescription>Update plan details for this tenant.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Plan Type</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={editSubForm.planType}
+                      onChange={(e) => setEditSubForm({ ...editSubForm, planType: e.target.value as any })}
+                    >
+                      <option value="free">Free</option>
+                      <option value="pro">Pro</option>
+                      <option value="enterprise">Enterprise</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={editSubForm.status}
+                      onChange={(e) => setEditSubForm({ ...editSubForm, status: e.target.value as any })}
+                    >
+                      <option value="active">Active</option>
+                      <option value="trial">Trial</option>
+                      <option value="expired">Expired</option>
+                    </select>
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={handleSaveSubscription}
+                    disabled={updateSubscription.isPending}
+                  >
+                    {updateSubscription.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="promos" className="mt-4 space-y-4">
@@ -664,7 +1094,7 @@ export default function SuperAdmin() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
-                <DialogHeader>
+                  <DialogHeader>
                     <DialogTitle>Create Promo Code</DialogTitle>
                     <DialogDescription>Create a new promo code to extend subscription periods.</DialogDescription>
                   </DialogHeader>
@@ -770,7 +1200,7 @@ export default function SuperAdmin() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  onClick={() => deletePromoCode.mutate(promo.id)}
+                                  onClick={() => setDeletePromoId(promo.id)}
                                   disabled={deletePromoCode.isPending}
                                   className="hover:bg-destructive/10"
                                 >
@@ -805,11 +1235,10 @@ export default function SuperAdmin() {
                       tenantProfiles.map((profile) => (
                         <div
                           key={profile.id}
-                          className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
-                            selectedProfileIds.includes(profile.id)
-                              ? 'bg-primary/10 border border-primary/30'
-                              : 'hover:bg-background/50'
-                          }`}
+                          className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${selectedProfileIds.includes(profile.id)
+                            ? 'bg-primary/10 border border-primary/30'
+                            : 'hover:bg-background/50'
+                            }`}
                           onClick={() => toggleProfileSelection(profile.id)}
                         >
                           <div>
@@ -825,8 +1254,8 @@ export default function SuperAdmin() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {selectedProfileIds.length === 0 
-                        ? 'Public (all users can use)' 
+                      {selectedProfileIds.length === 0
+                        ? 'Public (all users can use)'
                         : `${selectedProfileIds.length} user(s) selected`}
                     </span>
                     {selectedProfileIds.length > 0 && (
@@ -840,8 +1269,8 @@ export default function SuperAdmin() {
                       </Button>
                     )}
                   </div>
-                  <Button 
-                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold" 
+                  <Button
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold"
                     onClick={handleSaveAssignments}
                     disabled={assignPromoCode.isPending}
                   >
@@ -863,7 +1292,7 @@ export default function SuperAdmin() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
-                <DialogHeader>
+                  <DialogHeader>
                     <DialogTitle>Send System Update</DialogTitle>
                     <DialogDescription>Broadcast an announcement to all mess owners.</DialogDescription>
                   </DialogHeader>
@@ -950,7 +1379,11 @@ export default function SuperAdmin() {
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Payment Gateway</Label>
-                        <select className="w-full p-2 border border-border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-primary">
+                        <select
+                          className="w-full p-2 border border-border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-primary"
+                          value={gatewayConfig.provider}
+                          onChange={(e) => setGatewayConfig({ ...gatewayConfig, provider: e.target.value })}
+                        >
                           <option value="razorpay">Razorpay</option>
                           <option value="stripe">Stripe</option>
                           <option value="paypal">PayPal</option>
@@ -959,31 +1392,50 @@ export default function SuperAdmin() {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">API Key</Label>
-                        <Input 
-                          type="password" 
+                        <Input
+                          type="password"
                           placeholder="Enter your API key"
                           className="border-border focus:border-border focus:ring-border"
+                          value={gatewayConfig.apiKey}
+                          onChange={(e) => setGatewayConfig({ ...gatewayConfig, apiKey: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Secret Key</Label>
-                        <Input 
-                          type="password" 
+                        <Input
+                          type="password"
                           placeholder="Enter your secret key"
                           className="border-border focus:border-border focus:ring-border"
+                          value={gatewayConfig.secretKey}
+                          onChange={(e) => setGatewayConfig({ ...gatewayConfig, secretKey: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Webhook URL</Label>
-                        <Input 
-                          type="text" 
+                        <Input
+                          type="text"
                           value="https://api.messflow.com/webhook/payments"
                           readOnly
                           className="border-border bg-background/50 text-muted-foreground"
                         />
                       </div>
+                      <div className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          id="defaultGateway"
+                          checked={isGatewayEnabled}
+                          onCheckedChange={(checked) => setIsGatewayEnabled(checked as boolean)}
+                        />
+                        <Label htmlFor="defaultGateway" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          Use as Default Gateway for All Tenants
+                        </Label>
+                      </div>
                       <div className="flex gap-2">
-                        <Button className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold">
+                        <Button
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold"
+                          onClick={handleSaveGatewayConfig}
+                          disabled={updateGatewaySettings.isPending}
+                        >
+                          {updateGatewaySettings.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Save Configuration
                         </Button>
                         <Button variant="outline" className="border-border text-foreground hover:bg-background/50">
@@ -1033,7 +1485,7 @@ export default function SuperAdmin() {
                   </Card>
                 </div>
 
-                  {/* Tenant Payment Details */}
+                {/* Tenant Payment Details */}
                 <div className="mt-6">
                   <Card className="border-border bg-background/50">
                     <CardHeader>
@@ -1062,7 +1514,7 @@ export default function SuperAdmin() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge 
+                                  <Badge
                                     variant={profile.payment_link ? 'default' : 'destructive'}
                                     className={`${profile.payment_link ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'} font-medium`}
                                   >
@@ -1074,8 +1526,8 @@ export default function SuperAdmin() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-2">
-                                    <Dialog 
-                                      open={editingPaymentLink === profile.id} 
+                                    <Dialog
+                                      open={editingPaymentLink === profile.id}
                                       onOpenChange={(open) => {
                                         if (!open) setEditingPaymentLink(null);
                                         else {
@@ -1085,8 +1537,8 @@ export default function SuperAdmin() {
                                       }}
                                     >
                                       <DialogTrigger asChild>
-                                        <Button 
-                                          size="sm" 
+                                        <Button
+                                          size="sm"
                                           variant="outline"
                                           className="border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
                                         >
@@ -1113,15 +1565,15 @@ export default function SuperAdmin() {
                                             </p>
                                           </div>
                                           <div className="flex gap-2">
-                                            <Button 
-                                              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold" 
+                                            <Button
+                                              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold"
                                               onClick={() => handleSavePaymentLink(profile.id)}
                                               disabled={updatePaymentLink.isPending}
                                             >
                                               {updatePaymentLink.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                               Save Payment Link
                                             </Button>
-                                            <Button 
+                                            <Button
                                               variant="outline"
                                               onClick={() => {
                                                 setNewPaymentLink('https://wa.me/971501234567?text=I%20want%20to%20subscribe%20to%20MessFlow');
@@ -1238,7 +1690,7 @@ export default function SuperAdmin() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => removeSuperAdmin.mutate(admin.id)}
+                              onClick={() => setRemoveAdminId(admin.id)}
                               disabled={removeSuperAdmin.isPending}
                               className="hover:bg-destructive/10"
                             >
@@ -1255,6 +1707,54 @@ export default function SuperAdmin() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Delete Promo Code Confirmation */}
+      <AlertDialog open={!!deletePromoId} onOpenChange={() => setDeletePromoId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Promo Code?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this promo code and all its assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletePromoId) deletePromoCode.mutate(deletePromoId);
+                setDeletePromoId(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Super Admin Confirmation */}
+      <AlertDialog open={!!removeAdminId} onOpenChange={() => setRemoveAdminId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Super Admin?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove super admin privileges from this user. They will no longer be able to access the admin panel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removeAdminId) removeSuperAdmin.mutate(removeAdminId);
+                setRemoveAdminId(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SuperAdminLayout>
   );
 }

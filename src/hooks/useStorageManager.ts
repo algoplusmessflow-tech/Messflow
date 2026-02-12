@@ -31,13 +31,13 @@ export function useStorageManager() {
    * Upload a receipt to Cloudinary
    * Returns the public URL of the uploaded image
    */
-  const uploadReceipt = async (file: File, expenseId: string): Promise<{ url: string; size: number } | null> => {
+  const uploadReceipt = async (file: File): Promise<{ url: string; size: number } | null> => {
     if (!user) throw new Error('Not authenticated');
-    
+
     try {
       // Upload to Cloudinary
       const result = await uploadReceiptToCloudinary(file);
-      
+
       // Track storage usage (for UI purposes)
       const { error: updateError } = await supabase
         .from('profiles')

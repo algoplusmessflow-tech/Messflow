@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
 
-export type PettyCashType = 'refill' | 'expense';
+export type PettyCashType = 'deposit' | 'withdrawal';
 
 export interface PettyCashTransaction {
   id: string;
@@ -32,7 +32,7 @@ export function usePettyCash() {
         .select('*')
         .eq('owner_id', user.id)
         .order('date', { ascending: false });
-      
+
       if (error) throw error;
       return data as PettyCashTransaction[];
     },
@@ -68,21 +68,21 @@ export function usePettyCash() {
   const currentBalance = transactions.length > 0 ? Number(transactions[0].balance_after) : 0;
 
   const addRefill = useMutation({
-    mutationFn: async ({ amount, description, linkedExpenseId }: { 
-      amount: number; 
+    mutationFn: async ({ amount, description, linkedExpenseId }: {
+      amount: number;
       description: string;
       linkedExpenseId?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
-      
+
       const newBalance = currentBalance + amount;
-      
+
       const { data, error } = await supabase
         .from('petty_cash_transactions')
         .insert({
           owner_id: user.id,
           amount,
-          type: 'refill' as PettyCashType,
+          type: 'deposit' as PettyCashType,
           description,
           balance_after: newBalance,
           linked_expense_id: linkedExpenseId || null,
@@ -103,23 +103,24 @@ export function usePettyCash() {
   });
 
   const addSmallExpense = useMutation({
-    mutationFn: async ({ amount, description }: { amount: number; description: string }) => {
+    mutationFn: async ({ amount, description, linkedExpenseId }: { amount: number; description: string; linkedExpenseId?: string }) => {
       if (!user) throw new Error('Not authenticated');
-      
+
       if (amount > currentBalance) {
         throw new Error('Insufficient petty cash balance');
       }
-      
+
       const newBalance = currentBalance - amount;
-      
+
       const { data, error } = await supabase
         .from('petty_cash_transactions')
         .insert({
           owner_id: user.id,
           amount,
-          type: 'expense' as PettyCashType,
+          type: 'withdrawal' as PettyCashType,
           description,
           balance_after: newBalance,
+          linked_expense_id: linkedExpenseId || null,
         })
         .select()
         .single();

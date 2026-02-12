@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +48,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { UpgradePlanModal } from '@/components/UpgradePlanModal';
 import { MemberImportModal } from '@/components/MemberImportModal';
 import { MemberRenewalModal } from '@/components/MemberRenewalModal';
+import { TransactionHistoryModal } from '@/components/TransactionHistoryModal';
 import { cn } from '@/lib/utils';
 
 type PlanType = Database['public']['Enums']['plan_type'];
@@ -82,13 +82,17 @@ export default function Members() {
     plan_expiry_date: null as Date | null,
   });
   const [paymentAmount, setPaymentAmount] = useState('');
-  
+  const [paymentDate, setPaymentDate] = useState<Date | null>(new Date());
+  const [showPaymentCalendar, setShowPaymentCalendar] = useState(false);
+  const [showJoiningCalendar, setShowJoiningCalendar] = useState(false);
+  const [showExpiryCalendar, setShowExpiryCalendar] = useState(false);
+
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<MemberStatus | 'all'>('all');
   const [planFilter, setPlanFilter] = useState<PlanType | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -101,7 +105,7 @@ export default function Members() {
   // Filtered members
   const filteredMembers = useMemo(() => {
     return members.filter((member) => {
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch = searchQuery === '' ||
         member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         member.phone.includes(searchQuery);
       const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
@@ -125,19 +129,19 @@ export default function Members() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Check free tier limit
     if (!freeTierLimits.canAddMember) {
       setUpgradeLimitType('members');
       setIsUpgradeOpen(true);
       return;
     }
-    
+
     const joiningDate = new Date(formData.joining_date);
     const expiryDate = calculateExpiryDate(joiningDate);
     const monthlyFee = Number(formData.monthly_fee);
     const balance = formData.isPaid ? 0 : monthlyFee;
-    
+
     const newMember = await addMember.mutateAsync({
       name: formData.name.trim(),
       phone: formData.phone.trim(),
@@ -165,10 +169,10 @@ export default function Members() {
       setIsInvoiceDialogOpen(true);
     }
 
-    setFormData({ 
-      name: '', 
-      phone: '', 
-      plan_type: '3-time', 
+    setFormData({
+      name: '',
+      phone: '',
+      plan_type: '3-time',
       monthly_fee: '',
       joining_date: toDateInputValue(new Date()),
       isPaid: true,
@@ -187,6 +191,7 @@ export default function Members() {
       member_id: selectedMember.id,
       amount,
       type: 'payment',
+      date: paymentDate ? paymentDate.toISOString() : new Date().toISOString(),
     });
 
     const newBalance = Number(selectedMember.balance) - amount;
@@ -202,6 +207,7 @@ export default function Members() {
     });
 
     setPaymentAmount('');
+    setPaymentDate(new Date());
     setSelectedMember(null);
     setIsPaymentOpen(false);
     setIsInvoiceDialogOpen(true);
@@ -217,17 +223,17 @@ export default function Members() {
 
   const handleDownloadInvoice = async () => {
     if (!lastPaymentInfo || !profile) return;
-    
+
     // Check free tier limit for invoices
     if (!freeTierLimits.canGenerateInvoice) {
       setUpgradeLimitType('invoices');
       setIsUpgradeOpen(true);
       return;
     }
-    
+
     try {
       const invoiceNumber = getNextInvoiceNumber();
-      
+
       await generateMemberInvoice(
         lastPaymentInfo.memberName,
         lastPaymentInfo.amount,
@@ -239,10 +245,10 @@ export default function Members() {
         profile.company_address,
         profile.company_logo_url
       );
-      
+
       // Increment invoice number for next time
       await incrementInvoiceNumber.mutateAsync();
-      
+
       toast.success('Invoice downloaded!');
     } catch (error) {
       toast.error('Failed to generate invoice');
@@ -277,10 +283,10 @@ Date: ${formatDate(new Date())}
 Thank you for your business! 🙏`;
 
     const cleanPhone = lastPaymentInfo.phone.replace(/[\s-]/g, '');
-    const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) : 
-                          cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
-                          cleanPhone.startsWith('971') ? cleanPhone :
-                          `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
+    const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) :
+      cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
+        cleanPhone.startsWith('971') ? cleanPhone :
+          `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
 
     const whatsappUrl = `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -289,17 +295,17 @@ Thank you for your business! 🙏`;
 
   const handleShareWhatsAppPDF = async () => {
     if (!lastPaymentInfo || !profile) return;
-    
+
     // Check free tier limit for invoices
     if (!freeTierLimits.canGenerateInvoice) {
       setUpgradeLimitType('invoices');
       setIsUpgradeOpen(true);
       return;
     }
-    
+
     try {
       const invoiceNumber = getNextInvoiceNumber();
-      
+
       await shareInvoiceViaWhatsApp(
         lastPaymentInfo.memberName,
         lastPaymentInfo.phone,
@@ -311,10 +317,10 @@ Thank you for your business! 🙏`;
         profile.tax_name || 'VAT',
         profile.company_address
       );
-      
+
       // Increment invoice number for next time
       await incrementInvoiceNumber.mutateAsync();
-      
+
       setIsInvoiceDialogOpen(false);
     } catch (error) {
       console.error('Failed to share PDF via WhatsApp:', error);
@@ -340,10 +346,10 @@ ${profile.payment_link ? `Pay online: ${profile.payment_link}` : ''}
 Thank you for your prompt attention! 🙏`;
 
       const cleanPhone = member.phone.replace(/[\s-]/g, '');
-      const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) : 
-                            cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
-                            cleanPhone.startsWith('971') ? cleanPhone :
-                            `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
+      const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) :
+        cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
+          cleanPhone.startsWith('971') ? cleanPhone :
+            `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
 
       // Open WhatsApp links with delay to prevent browser blocking
       setTimeout(() => {
@@ -356,9 +362,37 @@ Thank you for your prompt attention! 🙏`;
     setIsBulkReminderOpen(false);
   };
 
+  const handleSingleReminder = (member: typeof members[0]) => {
+    if (!profile) return;
+
+    const message = `📢 *Payment Reminder*
+
+*${profile.business_name}*
+
+Dear ${member.name},
+
+This is a friendly reminder that you have an outstanding balance of *AED ${Number(member.balance).toFixed(2)}*.
+
+${member.plan_expiry_date ? `Due Date: ${formatDate(new Date(member.plan_expiry_date))}` : ''}
+
+${profile.payment_link ? `Pay online: ${profile.payment_link}` : ''}
+
+Thank you for your prompt attention! 🙏`;
+
+    const cleanPhone = member.phone.replace(/[\s-]/g, '');
+    const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) :
+      cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
+        cleanPhone.startsWith('971') ? cleanPhone :
+          `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
+
+    const whatsappUrl = `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const openPayment = (member: typeof members[0]) => {
     setSelectedMember(member);
     setPaymentAmount('');
+    setPaymentDate(new Date());
     setIsPaymentOpen(true);
   };
 
@@ -442,11 +476,11 @@ Thank you for your prompt attention! 🙏`;
             <h1 className="text-2xl font-bold">Members</h1>
             <p className="text-muted-foreground">{filteredMembers.length} of {members.length} members</p>
           </div>
-          
+
           <div className="flex gap-2">
             {unpaidMembers.length > 0 && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setIsBulkReminderOpen(true)}
               >
@@ -454,16 +488,16 @@ Thank you for your prompt attention! 🙏`;
                 Remind ({unpaidMembers.length})
               </Button>
             )}
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setIsImportOpen(true)}
             >
               <Upload className="h-4 w-4 mr-1" />
               Import
             </Button>
-            
+
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
@@ -533,7 +567,7 @@ Thank you for your prompt attention! 🙏`;
                       required
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                     <div className="space-y-0.5">
                       <Label htmlFor="paid-toggle" className="text-base">Payment Status</Label>
@@ -650,7 +684,7 @@ Thank you for your prompt attention! 🙏`;
           ) : filteredMembers.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                {members.length === 0 
+                {members.length === 0
                   ? 'No members yet. Add your first member to get started.'
                   : 'No members match your search or filters.'}
               </CardContent>
@@ -660,10 +694,10 @@ Thank you for your prompt attention! 🙏`;
               const expiryStatus = getMemberExpiryStatus(member);
               const isPaid = Number(member.balance) === 0;
               const isExpiredOrExpiring = expiryStatus?.status === 'expired' || expiryStatus?.status === 'expiring';
-              
+
               return (
-                <Card 
-                  key={member.id} 
+                <Card
+                  key={member.id}
                   className={`overflow-hidden ${expiryStatus?.status === 'expiring' ? 'border-amber-500' : expiryStatus?.status === 'expired' ? 'border-destructive' : ''}`}
                 >
                   <CardContent className="p-4">
@@ -678,12 +712,12 @@ Thank you for your prompt attention! 🙏`;
                             {isPaid ? 'Paid' : 'Unpaid'}
                           </Badge>
                           {expiryStatus && (
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={expiryStatus.status === 'expiring' ? 'border-amber-500 text-amber-500' : 'border-destructive text-destructive'}
                             >
                               <AlertTriangle className="h-3 w-3 mr-1" />
-                              {expiryStatus.status === 'expired' 
+                              {expiryStatus.status === 'expired'
                                 ? `Expired ${expiryStatus.days}d ago`
                                 : `Expires in ${expiryStatus.days}d`
                               }
@@ -736,6 +770,18 @@ Thank you for your prompt attention! 🙏`;
                             >
                               <RefreshCw className="h-3 w-3 mr-1" />
                               Renew
+                            </Button>
+                          )}
+                          {Number(member.balance) > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-amber-500 text-amber-600 hover:bg-amber-500/10"
+                              onClick={() => handleSingleReminder(member)}
+                              title="Send WhatsApp Reminder"
+                            >
+                              <MessageCircle className="h-3 w-3 mr-1" />
+                              Remind
                             </Button>
                           )}
                           <Button
@@ -794,7 +840,7 @@ Thank you for your prompt attention! 🙏`;
                   {selectedMember.plan_expiry_date && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
+                        <CalendarIcon className="h-3 w-3" />
                         Due Date:
                       </span>
                       <span className="font-medium">
@@ -816,6 +862,36 @@ Thank you for your prompt attention! 🙏`;
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Payment Date</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowPaymentCalendar(!showPaymentCalendar)}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !paymentDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {paymentDate ? format(paymentDate, "PPP") : "Pick a date"}
+                  </Button>
+                  {showPaymentCalendar && (
+                    <div className="rounded-md border bg-background p-0 shadow-sm">
+                      <Calendar
+                        mode="single"
+                        selected={paymentDate || undefined}
+                        onSelect={(date) => {
+                          setPaymentDate(date || null);
+                          setShowPaymentCalendar(false);
+                        }}
+                        initialFocus
+                        className="p-3"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="amount">Or Enter Custom Amount (AED)</Label>
                   <Input
                     id="amount"
@@ -833,7 +909,7 @@ Thank you for your prompt attention! 🙏`;
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">After this payment:</span>
                       <span className={`font-semibold ${getRemainingAfterPayment() > 0 ? 'text-destructive' : 'text-primary'}`}>
-                        {getRemainingAfterPayment() > 0 
+                        {getRemainingAfterPayment() > 0
                           ? `${formatCurrency(getRemainingAfterPayment())} remaining`
                           : 'Fully Paid ✓'
                         }
@@ -923,55 +999,61 @@ Thank you for your prompt attention! 🙏`;
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Joining Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !editFormData.joining_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editFormData.joining_date ? format(editFormData.joining_date, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowJoiningCalendar(!showJoiningCalendar)}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !editFormData.joining_date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editFormData.joining_date ? format(editFormData.joining_date, "PPP") : "Pick a date"}
+                  </Button>
+                  {showJoiningCalendar && (
+                    <div className="rounded-md border bg-background p-0 shadow-sm">
                       <Calendar
                         mode="single"
                         selected={editFormData.joining_date || undefined}
-                        onSelect={(date) => setEditFormData({ ...editFormData, joining_date: date || null })}
+                        onSelect={(date) => {
+                          setEditFormData({ ...editFormData, joining_date: date || null });
+                          setShowJoiningCalendar(false);
+                        }}
                         initialFocus
-                        className={cn("p-3 pointer-events-auto")}
+                        className="p-3"
                       />
-                    </PopoverContent>
-                  </Popover>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Subscription Expiry</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !editFormData.plan_expiry_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editFormData.plan_expiry_date ? format(editFormData.plan_expiry_date, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowExpiryCalendar(!showExpiryCalendar)}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !editFormData.plan_expiry_date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editFormData.plan_expiry_date ? format(editFormData.plan_expiry_date, "PPP") : "Pick a date"}
+                  </Button>
+                  {showExpiryCalendar && (
+                    <div className="rounded-md border bg-background p-0 shadow-sm">
                       <Calendar
                         mode="single"
                         selected={editFormData.plan_expiry_date || undefined}
-                        onSelect={(date) => setEditFormData({ ...editFormData, plan_expiry_date: date || null })}
+                        onSelect={(date) => {
+                          setEditFormData({ ...editFormData, plan_expiry_date: date || null });
+                          setShowExpiryCalendar(false);
+                        }}
                         initialFocus
-                        className={cn("p-3 pointer-events-auto")}
+                        className="p-3"
                       />
-                    </PopoverContent>
-                  </Popover>
+                    </div>
+                  )}
                 </div>
               </div>
               <Button type="submit" className="w-full" disabled={updateMember.isPending}>
@@ -995,66 +1077,16 @@ Thank you for your prompt attention! 🙏`;
         />
 
         {/* History Dialog */}
-        <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Transaction History</DialogTitle>
-            </DialogHeader>
-            {selectedMember && (
-              <div className="space-y-4">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="font-medium">{selectedMember.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Current Balance: {formatCurrency(Number(selectedMember.balance))}
-                  </p>
-                </div>
-
-                <ScrollArea className="h-[300px]">
-                  {getMemberTransactions(selectedMember.id).length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
-                      No transactions yet.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {getMemberTransactions(selectedMember.id).map((tx) => {
-                        const typeInfo = getTransactionTypeLabel(tx.type);
-                        return (
-                          <div 
-                            key={tx.id} 
-                            className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                          >
-                            <div>
-                              <p className={`font-medium ${typeInfo.color}`}>
-                                {typeInfo.label}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDate(new Date(tx.date))}
-                              </p>
-                              {tx.notes && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {tx.notes}
-                                </p>
-                              )}
-                            </div>
-                            <p className={`font-semibold ${tx.type === 'payment' ? 'text-primary' : 'text-destructive'}`}>
-                              {tx.type === 'payment' ? '-' : '+'}
-                              {formatCurrency(Number(tx.amount))}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </ScrollArea>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setIsHistoryOpen(false)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <TransactionHistoryModal
+          open={isHistoryOpen}
+          onOpenChange={setIsHistoryOpen}
+          member={selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            balance: Number(selectedMember.balance),
+            phone: selectedMember.phone,
+          } : null}
+        />
 
         {/* Bulk Reminder Dialog */}
         <AlertDialog open={isBulkReminderOpen} onOpenChange={setIsBulkReminderOpen}>
@@ -1062,7 +1094,7 @@ Thank you for your prompt attention! 🙏`;
             <AlertDialogHeader>
               <AlertDialogTitle>Send Payment Reminders</AlertDialogTitle>
               <AlertDialogDescription>
-                This will open WhatsApp for {unpaidMembers.length} members with outstanding balances. 
+                This will open WhatsApp for {unpaidMembers.length} members with outstanding balances.
                 Each reminder will include their name, balance amount, and due date.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -1099,24 +1131,24 @@ Thank you for your prompt attention! 🙏`;
                   What would you like to do?
                 </p>
                 <div className="grid gap-3">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start"
                     onClick={handleDownloadInvoice}
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Download Invoice (PDF)
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start text-primary hover:text-primary/80 hover:bg-primary/10"
                     onClick={handleShareWhatsAppPDF}
                   >
                     <Share2 className="h-4 w-4 mr-2" />
                     Share PDF via WhatsApp
                   </Button>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="w-full justify-start text-muted-foreground"
                     onClick={handleShareWhatsApp}
                   >
@@ -1151,7 +1183,7 @@ Thank you for your prompt attention! 🙏`;
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        
+
         {/* Upgrade Plan Modal */}
         <UpgradePlanModal
           open={isUpgradeOpen}
@@ -1159,16 +1191,16 @@ Thank you for your prompt attention! 🙏`;
           limitType={upgradeLimitType}
           currentCount={
             upgradeLimitType === 'members' ? freeTierLimits.memberCount :
-            upgradeLimitType === 'invoices' ? freeTierLimits.invoiceCount :
-            freeTierLimits.receiptCount
+              upgradeLimitType === 'invoices' ? freeTierLimits.invoiceCount :
+                freeTierLimits.receiptCount
           }
           limit={
             upgradeLimitType === 'members' ? freeTierLimits.memberLimit :
-            upgradeLimitType === 'invoices' ? freeTierLimits.invoiceLimit :
-            freeTierLimits.receiptLimit
+              upgradeLimitType === 'invoices' ? freeTierLimits.invoiceLimit :
+                freeTierLimits.receiptLimit
           }
         />
-        
+
         {/* Member Import Modal */}
         <MemberImportModal
           open={isImportOpen}

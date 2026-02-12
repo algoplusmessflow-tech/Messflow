@@ -39,10 +39,9 @@ function StatCard({
         {loading ? (
           <Skeleton className="h-8 w-24" />
         ) : (
-          <p className={`text-2xl font-bold ${
-            variant === 'success' ? 'text-green-500' : 
+          <p className={`text-2xl font-bold ${variant === 'success' ? 'text-green-500' :
             variant === 'destructive' ? 'text-destructive' : ''
-          }`}>
+            }`}>
             {value}
           </p>
         )}
@@ -78,7 +77,7 @@ export default function Dashboard() {
           // Invalidate relevant queries when profile is updated
           queryClient.invalidateQueries({ queryKey: ['profile'] });
           queryClient.invalidateQueries({ queryKey: ['generation-limits'] });
-          
+
           // Show success toast for plan upgrade
           if (payload.new.plan_type === 'pro' && payload.old.plan_type === 'free') {
             toast.success('🎉 Plan upgraded! Generation limits removed.');
@@ -92,12 +91,26 @@ export default function Dashboard() {
     };
   }, [profile?.id, queryClient]);
 
-  // Members expiring soon (within 4 days)
+  // Members expiring soon (within 7 days)
   const expiringMembers = members.filter((member) => {
     if (!member.plan_expiry_date) return false;
     const days = getDaysUntilExpiry(member.plan_expiry_date);
-    return days >= 0 && days <= 4;
+    return days >= 0 && days <= 7;
   });
+
+  // Notify about expiring members
+  useEffect(() => {
+    if (expiringMembers.length > 0 && !isLoading) {
+      toast('Member Renewals Due', {
+        description: `${expiringMembers.length} members are expiring within 7 days.`,
+        action: {
+          label: 'View',
+          onClick: () => document.getElementById('expiring-section')?.scrollIntoView({ behavior: 'smooth' }),
+        },
+        duration: 5000,
+      });
+    }
+  }, [expiringMembers.length, isLoading]);
 
   // Members with overdue payments (expired plan + outstanding balance)
   const overdueMembers = members.filter((member) => {
@@ -213,8 +226,8 @@ export default function Dashboard() {
                   {overdueMembers.slice(0, 5).map((member) => {
                     const daysOverdue = Math.abs(getDaysUntilExpiry(member.plan_expiry_date!));
                     return (
-                      <div 
-                        key={member.id} 
+                      <div
+                        key={member.id}
                         className="flex items-center justify-between p-3 bg-background/50 rounded-lg border border-destructive/20 hover:bg-destructive/10 transition-colors"
                       >
                         <div>
@@ -243,7 +256,7 @@ export default function Dashboard() {
 
         {/* Expiring Soon Widget */}
         {expiringMembers.length > 0 && (
-          <Card className="backdrop-blur-xl border-amber-300/30 bg-card/80 hover:shadow-lg hover:shadow-glass transition-all duration-300">
+          <Card id="expiring-section" className="backdrop-blur-xl border-amber-300/30 bg-card/80 hover:shadow-lg hover:shadow-glass transition-all duration-300">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2 text-amber-600 font-semibold">
                 <AlertTriangle className="h-5 w-5" />
@@ -255,8 +268,8 @@ export default function Dashboard() {
                 {expiringMembers.slice(0, 5).map((member) => {
                   const days = getDaysUntilExpiry(member.plan_expiry_date!);
                   return (
-                    <div 
-                      key={member.id} 
+                    <div
+                      key={member.id}
                       className="flex items-center justify-between p-3 bg-background/50 rounded-lg border border-amber-300/20 hover:bg-amber-500/10 transition-colors"
                     >
                       <div>
@@ -300,7 +313,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <div className="w-full bg-background rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${Math.min((generationLimits.pdfCount / generationLimits.pdfLimit) * 100, 100)}%` }}
                     ></div>
@@ -317,7 +330,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <div className="w-full bg-background rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-green-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${Math.min((generationLimits.excelCount / generationLimits.excelLimit) * 100, 100)}%` }}
                     ></div>
@@ -328,8 +341,8 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="mt-4 text-center">
-                <Link 
-                  to="/pricing" 
+                <Link
+                  to="/pricing"
                   className="text-sm text-blue-600 hover:text-blue-500 font-medium underline"
                 >
                   Upgrade to Pro for unlimited generations
@@ -386,13 +399,13 @@ export default function Dashboard() {
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={weeklyProfitLoss}>
-                    <XAxis 
-                      dataKey="day" 
+                    <XAxis
+                      dataKey="day"
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
                     />
-                    <YAxis 
+                    <YAxis
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
@@ -410,16 +423,16 @@ export default function Dashboard() {
                       }}
                     />
                     <Legend />
-                    <Bar 
-                      dataKey="income" 
+                    <Bar
+                      dataKey="income"
                       name="Income"
-                      fill="hsl(142 76% 36%)" 
+                      fill="hsl(142 76% 36%)"
                       radius={[0, 0, 0, 0]}
                     />
-                    <Bar 
-                      dataKey="expenses" 
+                    <Bar
+                      dataKey="expenses"
                       name="Expenses"
-                      fill="hsl(var(--destructive))" 
+                      fill="hsl(var(--destructive))"
                       radius={[0, 0, 0, 0]}
                     />
                   </BarChart>

@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -18,10 +20,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useExpenses, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
+import { usePettyCash } from '@/hooks/usePettyCash';
 import { useStorageManager } from '@/hooks/useStorageManager';
 import { useCurrency } from '@/hooks/useCurrency';
 import { formatDate, toDateInputValue } from '@/lib/format';
-import { Plus, Trash2, Receipt, TrendingDown, Upload, Pencil, Loader2, Camera } from 'lucide-react';
+import { Plus, Trash2, Receipt, TrendingDown, Upload, Pencil, Loader2, Camera, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { PettyCashWidget } from '@/components/PettyCashWidget';
@@ -33,6 +36,7 @@ type ExpenseCategory = Database['public']['Enums']['expense_category'];
 export default function Expenses() {
   const { expenses, isLoading, addExpense, updateExpense, deleteExpense, todayExpenses, monthlyExpenses } = useExpenses();
   const { uploadReceipt, canUpload, formatBytes, storageLimit, storageUsed } = useStorageManager();
+  const { addSmallExpense, currentBalance: pettyCashBalance, transactions: pettyCashTransactions } = usePettyCash();
   const { formatAmount } = useCurrency();
   const [open, setOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -52,46 +56,56 @@ export default function Expenses() {
     category: 'groceries' as ExpenseCategory,
     date: toDateInputValue(new Date()),
   });
+  const [isPettyCash, setIsPettyCash] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description || !formData.amount) return;
 
+    // Check petty cash balance if selected
+    const amount = parseFloat(formData.amount);
+    if (isPettyCash && amount > pettyCashBalance) {
+      toast.error(`Insufficient petty cash balance (Available: ${formatAmount(pettyCashBalance)})`);
+      return;
+    }
+
     setUploading(true);
     try {
-      // Check storage quota before upload
+      let receiptUrl = undefined;
+      let receiptSize = 0;
+
+      // Check storage quota and upload FIRST
       if (receiptFile) {
         if (!canUpload(receiptFile.size)) {
           toast.error(`Storage limit exceeded. You have ${formatBytes(storageLimit - storageUsed)} remaining.`);
           setUploading(false);
           return;
         }
+
+        const result = await uploadReceipt(receiptFile);
+        if (result) {
+          receiptUrl = result.url;
+          receiptSize = result.size;
+        }
       }
 
-      // First create the expense to get ID
-      const expenseData = await addExpense.mutateAsync({
+      // Then save to DB with the URL
+      const newExpense = await addExpense.mutateAsync({
         description: formData.description,
-        amount: parseFloat(formData.amount),
+        amount,
         category: formData.category,
         date: new Date(formData.date).toISOString(),
-        receipt_url: undefined,
-        file_size_bytes: 0,
+        receipt_url: receiptUrl,
+        file_size_bytes: receiptSize,
       });
 
-      // Then upload receipt if exists
-      if (receiptFile && expenseData) {
-        const result = await uploadReceipt(receiptFile, expenseData.id);
-        if (result) {
-          // Update expense with receipt URL
-          const { supabase } = await import('@/integrations/supabase/client');
-          await supabase
-            .from('expenses')
-            .update({ 
-              receipt_url: result.url,
-              file_size_bytes: result.size,
-            })
-            .eq('id', expenseData.id);
-        }
+      // Deduct from Petty Cash if selected
+      if (isPettyCash && newExpense?.id) {
+        await addSmallExpense.mutateAsync({
+          amount,
+          description: `Expense: ${formData.description}`,
+          linkedExpenseId: newExpense.id,
+        });
       }
 
       setFormData({
@@ -101,9 +115,11 @@ export default function Expenses() {
         date: toDateInputValue(new Date()),
       });
       setReceiptFile(null);
+      setIsPettyCash(false);
       setOpen(false);
     } catch (error: any) {
-      toast.error('Failed to add expense: ' + error.message);
+      // Error is handled by mutation onError usually, but we catch here too
+      console.error(error);
     } finally {
       setUploading(false);
     }
@@ -187,6 +203,16 @@ export default function Expenses() {
                     required
                   />
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="pettyCash"
+                    checked={isPettyCash}
+                    onCheckedChange={(checked) => setIsPettyCash(checked as boolean)}
+                  />
+                  <Label htmlFor="pettyCash" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Paid via Petty Cash
+                  </Label>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
                   <Select
@@ -238,7 +264,7 @@ export default function Expenses() {
                         </label>
                       </>
                     )}
-                    
+
                     {/* Desktop: File picker */}
                     <Input
                       id="receipt"
@@ -322,14 +348,20 @@ export default function Expenses() {
                         <div className="flex items-center gap-2">
                           <p className="font-medium truncate">{expense.description}</p>
                           {expense.receipt_url && (
-                            <a 
-                              href={expense.receipt_url} 
-                              target="_blank" 
+                            <a
+                              href={expense.receipt_url}
+                              target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary hover:underline"
+                              className="text-primary hover:text-primary/80 transition-colors"
+                              title="View Receipt"
                             >
-                              <Upload className="h-3 w-3" />
+                              <Eye className="h-4 w-4" />
                             </a>
+                          )}
+                          {pettyCashTransactions.some(tx => tx.linked_expense_id === expense.id) && (
+                            <Badge variant="secondary" className="text-[10px] h-5 px-1 bg-orange-100 text-orange-800 hover:bg-orange-200">
+                              Petty Cash
+                            </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

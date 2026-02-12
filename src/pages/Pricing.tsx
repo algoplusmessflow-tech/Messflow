@@ -6,55 +6,12 @@ import { useProfile } from '@/hooks/useProfile';
 import { useSubscription } from '@/hooks/useSubscription';
 import { formatDate } from '@/lib/format';
 import { Check, Crown, Zap, Star, AlertTriangle, ExternalLink } from 'lucide-react';
-
-const PLANS = [
-  {
-    name: 'Free',
-    price: 0,
-    features: [
-      'Up to 50 active members',
-      '10 receipt uploads',
-      '50 MB storage',
-      'Basic invoicing',
-      'Single user',
-    ],
-    limitations: [
-      'Limited storage',
-      'Basic support',
-    ],
-  },
-  {
-    name: 'Professional',
-    price: 199,
-    popular: true,
-    features: [
-      'Unlimited members',
-      'Unlimited receipt uploads',
-      '1 GB storage',
-      'Branded invoices with logo',
-      'WhatsApp integration',
-      'Priority support',
-      'Expense reports',
-    ],
-  },
-  {
-    name: 'Enterprise',
-    price: 345,
-    features: [
-      'Everything in Professional',
-      'Unlimited storage',
-      'Multiple users',
-      'Custom integrations',
-      'Dedicated support',
-      'White-label option',
-    ],
-  },
-];
+import { PLANS } from '@/lib/plans';
 
 export default function Pricing() {
   const { profile } = useProfile();
   const { subscriptionStatus, daysUntilExpiry, isExpired, isExpiringSoon } = useSubscription();
-  
+
   const isTrialActive = subscriptionStatus === 'trial';
 
   const handleSubscribe = () => {
@@ -89,13 +46,13 @@ export default function Pricing() {
                   <p className="text-sm text-muted-foreground">
                     {isTrialActive && `Trial ends in ${daysUntilExpiry} days`}
                     {isExpired && 'Subscription expired'}
-                    {subscriptionStatus === 'active' && !isTrialActive && profile?.subscription_expiry && 
+                    {subscriptionStatus === 'active' && !isTrialActive && profile?.subscription_expiry &&
                       `Active until ${formatDate(new Date(profile.subscription_expiry))}`
                     }
                   </p>
                 </div>
               </div>
-              
+
               {(isTrialActive || isExpired) && (
                 <Badge variant={isExpired ? 'destructive' : 'secondary'} className="flex items-center gap-1">
                   {isExpired ? (
@@ -118,8 +75,8 @@ export default function Pricing() {
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-6">
           {PLANS.map((plan) => (
-            <Card 
-              key={plan.name} 
+            <Card
+              key={plan.name}
               className={plan.popular ? 'border-primary shadow-lg relative' : ''}
             >
               {plan.popular && (
@@ -150,7 +107,7 @@ export default function Pricing() {
                     </li>
                   ))}
                 </ul>
-                
+
                 {plan.limitations && (
                   <ul className="space-y-2 pt-2 border-t border-border">
                     {plan.limitations.map((limitation, idx) => (
@@ -162,8 +119,8 @@ export default function Pricing() {
                   </ul>
                 )}
 
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   variant={plan.popular ? 'default' : 'outline'}
                   onClick={plan.price > 0 ? handleSubscribe : undefined}
                   disabled={plan.price === 0}
@@ -189,7 +146,7 @@ export default function Pricing() {
             <p className="text-sm text-muted-foreground mb-4">
               Contact us for custom pricing for large organizations or special requirements.
             </p>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => window.open('https://wa.me/971501234567?text=I%20need%20a%20custom%20plan%20for%20MessFlow', '_blank')}
             >

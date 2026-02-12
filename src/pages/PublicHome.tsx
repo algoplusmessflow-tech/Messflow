@@ -1,17 +1,19 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { 
-  UtensilsCrossed, 
-  Users, 
-  BarChart3, 
-  Calendar, 
-  CreditCard, 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  UtensilsCrossed,
+  Users,
+  BarChart3,
+  Calendar,
+  CreditCard,
   ChefHat,
   ArrowRight,
   CheckCircle2,
   Star
 } from 'lucide-react';
+import { PLANS } from '@/lib/plans';
 
 export default function PublicHome() {
   const features = [
@@ -98,7 +100,7 @@ export default function PublicHome() {
               <Star className="h-4 w-4 text-amber-500" />
               <span className="text-sm text-white/70">Trusted by 500+ mess operators worldwide</span>
             </div>
-            
+
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
               <span className="bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent">
                 Manage Your Mess
@@ -108,12 +110,12 @@ export default function PublicHome() {
                 Like Never Before
               </span>
             </h1>
-            
+
             <p className="text-xl text-white/60 mb-10 max-w-2xl mx-auto animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-              The all-in-one food mess and canteen management system. Handle members, menus, 
+              The all-in-one food mess and canteen management system. Handle members, menus,
               inventory, staff payroll, and expenses — all in one powerful platform.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
               <Button asChild size="lg" className="w-full sm:w-auto h-14 text-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0 shadow-lg shadow-amber-500/20">
                 <Link to="/login" className="flex items-center gap-2">
@@ -155,7 +157,7 @@ export default function PublicHome() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <Card 
+              <Card
                 key={index}
                 className="group bg-white/[0.03] border-white/5 hover:bg-white/[0.06] hover:border-amber-500/20 transition-all duration-300 hover:-translate-y-1"
               >
@@ -165,6 +167,65 @@ export default function PublicHome() {
                   </div>
                   <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                   <p className="text-white/60">{feature.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="relative z-10 py-24 bg-white/[0.02]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Simple, Transparent <span className="text-amber-400">Pricing</span>
+            </h2>
+            <p className="text-white/60 max-w-2xl mx-auto">
+              Choose the plan that fits your mess size
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {PLANS.map((plan) => (
+              <Card
+                key={plan.name}
+                className={`bg-white/[0.03] border-white/5 relative ${plan.popular ? 'border-amber-500/50 shadow-lg shadow-amber-500/10' : ''}`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-amber-500 text-white border-0">
+                      <Star className="h-3 w-3 mr-1" />
+                      Most Popular
+                    </Badge>
+                  </div>
+                )}
+                <CardHeader className="text-center pb-2">
+                  <CardTitle className="text-xl text-white">{plan.name}</CardTitle>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-white">
+                      {plan.price === 0 ? 'Free' : `AED ${plan.price}`}
+                    </span>
+                    {plan.price > 0 && (
+                      <span className="text-white/60">/month</span>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-white/80">
+                        <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button asChild className={`w-full ${plan.popular ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0' : 'bg-white/10 hover:bg-white/20 text-white border-0'}`}>
+                    <Link to="/login">
+                      {plan.price === 0 ? 'Get Started' : 'Start Free Trial'}
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -249,20 +310,20 @@ export default function PublicHome() {
               </div>
               <span className="font-bold">MessFlow</span>
             </div>
-            
+
             <div className="flex items-center gap-6 text-sm text-white/50">
               <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
-              <a 
-                href="https://algoplusit.com" 
-                target="_blank" 
+              <a
+                href="https://algoplusit.com"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-white transition-colors"
               >
                 Algo Plus
               </a>
             </div>
-            
+
             <p className="text-sm text-white/40">
               © {new Date().getFullYear()} MessFlow. All rights reserved.
             </p>

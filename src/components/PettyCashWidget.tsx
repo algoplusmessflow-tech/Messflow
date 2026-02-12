@@ -83,20 +83,20 @@ export function PettyCashWidget() {
           ) : (
             <p className="text-2xl font-bold">{formatAmount(currentBalance)}</p>
           )}
-          
+
           <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               className="flex-1"
               onClick={() => setRefillOpen(true)}
             >
               <Plus className="h-3 w-3 mr-1" />
               Add Funds
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               className="flex-1"
               onClick={() => setExpenseOpen(true)}
             >
@@ -112,15 +112,15 @@ export function PettyCashWidget() {
               {transactions.slice(0, 3).map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {tx.type === 'refill' ? (
+                    {tx.type === 'deposit' ? (
                       <ArrowUpCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
                     ) : (
                       <ArrowDownCircle className="h-3 w-3 text-destructive flex-shrink-0" />
                     )}
                     <span className="truncate">{tx.description}</span>
                   </div>
-                  <span className={tx.type === 'refill' ? 'text-green-500' : 'text-destructive'}>
-                    {tx.type === 'refill' ? '+' : '-'}{formatAmount(tx.amount)}
+                  <span className={tx.type === 'deposit' ? 'text-green-500' : 'text-destructive'}>
+                    {tx.type === 'deposit' ? '+' : '-'}{formatAmount(tx.amount)}
                   </span>
                 </div>
               ))}
@@ -214,8 +214,8 @@ export function PettyCashWidget() {
               <Button type="button" variant="outline" onClick={() => setExpenseOpen(false)}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={addSmallExpense.isPending || parseFloat(expenseAmount) > currentBalance}
               >
                 {addSmallExpense.isPending ? 'Recording...' : 'Record Expense'}
