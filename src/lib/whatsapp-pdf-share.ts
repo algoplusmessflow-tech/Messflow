@@ -17,6 +17,7 @@ export async function shareInvoiceViaWhatsApp(
   taxName: string = 'VAT',
   companyAddress?: string | null
 ): Promise<Blob | void> {
+  console.log('Starting shareInvoiceViaWhatsApp...');
   try {
     // Generate the PDF
     const pdfDoc = createInvoicePDF(
