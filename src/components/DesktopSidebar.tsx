@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useProfile } from '@/hooks/useProfile';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Logo } from '@/components/Logo';
+import { NotificationCenter } from '@/components/NotificationCenter';
 
 const navItems = [
   { to: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -41,9 +42,12 @@ export function DesktopSidebar() {
               </p>
             )}
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <NotificationCenter />
+            <ThemeToggle />
+          </div>
         </div>
-        
+
         <nav className="flex-1 px-2 space-y-1">
           {navItems.map((item) => (
             <NavLink
@@ -63,7 +67,7 @@ export function DesktopSidebar() {
             </NavLink>
           ))}
         </nav>
-        
+
         <div className="px-2 mt-auto">
           <Button
             variant="ghost"

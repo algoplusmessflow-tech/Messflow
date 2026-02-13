@@ -27,20 +27,31 @@ const typeColors: Record<string, string> = {
   member: 'text-green-500',
 };
 
+import { useBroadcasts } from '@/hooks/useBroadcasts';
+import { useSubscription } from '@/hooks/useSubscription';
+
 export function NotificationCenter() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const { latestBroadcast } = useBroadcasts();
+  const { daysUntilExpiry, subscriptionStatus } = useSubscription();
+
+  const isRenewalDue = daysUntilExpiry !== null && daysUntilExpiry <= 7;
+  const showBroadcast = !!latestBroadcast;
+
+  const totalAlerts = (isRenewalDue ? 1 : 0) + (showBroadcast ? 1 : 0);
+  const totalUnread = unreadCount + totalAlerts;
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge 
-              variant="destructive" 
+          {totalUnread > 0 && (
+            <Badge
+              variant="destructive"
               className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 text-xs"
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {totalUnread > 99 ? '99+' : totalUnread}
             </Badge>
           )}
         </Button>
@@ -49,9 +60,9 @@ export function NotificationCenter() {
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="font-semibold">Notifications</h3>
           {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="text-xs"
               onClick={() => markAllAsRead.mutate()}
             >
@@ -60,14 +71,54 @@ export function NotificationCenter() {
             </Button>
           )}
         </div>
-        <ScrollArea className="max-h-80">
-          {notifications.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">
-              No notifications yet
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {notifications.map((notification) => {
+        <ScrollArea className="max-h-[400px]">
+          <div className="divide-y divide-border">
+            {/* Critical Alerts Section */}
+            {(isRenewalDue || showBroadcast) && (
+              <div className="bg-muted/30">
+                {isRenewalDue && (
+                  <div className="p-3 bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer border-l-4 border-amber-500">
+                    <div className="flex gap-3">
+                      <div className="mt-0.5 text-amber-600">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-amber-900 dark:text-amber-100">Subscription Renewal Due</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Your subscription expires in {daysUntilExpiry} days. Renew now to avoid interruption.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {showBroadcast && latestBroadcast && (
+                  <div className="p-3 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer border-l-4 border-primary">
+                    <div className="flex gap-3">
+                      <div className="mt-0.5 text-primary">
+                        <Megaphone className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-primary">Announcement</p>
+                        <p className="font-medium text-xs mt-0.5 truncate">{latestBroadcast.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{latestBroadcast.message}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDate(new Date(latestBroadcast.created_at))}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Regular Notifications */}
+            {notifications.length === 0 && !isRenewalDue && !showBroadcast ? (
+              <div className="p-8 text-center text-muted-foreground text-sm">
+                No notifications yet
+              </div>
+            ) : (
+              notifications.map((notification) => {
                 const Icon = typeIcons[notification.type] || Bell;
                 const iconColor = typeColors[notification.type] || 'text-muted-foreground';
 
@@ -111,9 +162,9 @@ export function NotificationCenter() {
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </ScrollArea>
       </PopoverContent>
     </Popover>

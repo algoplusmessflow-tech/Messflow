@@ -69,6 +69,7 @@ export default function SuperAdmin() {
     provider: 'razorpay',
     apiKey: '',
     secretKey: '',
+    webhookUrl: 'https://api.messflow.com/webhook/payments',
   });
   const [isGatewayEnabled, setIsGatewayEnabled] = useState(false);
 
@@ -1414,9 +1415,10 @@ export default function SuperAdmin() {
                         <Label className="text-sm font-medium">Webhook URL</Label>
                         <Input
                           type="text"
-                          value="https://api.messflow.com/webhook/payments"
-                          readOnly
-                          className="border-border bg-background/50 text-muted-foreground"
+                          value={gatewayConfig.webhookUrl}
+                          onChange={(e) => setGatewayConfig({ ...gatewayConfig, webhookUrl: e.target.value })}
+                          placeholder="https://api.yourdomain.com/webhook"
+                          className="border-border focus:border-border focus:ring-border"
                         />
                       </div>
                       <div className="flex items-center space-x-2 py-2">

@@ -80,6 +80,7 @@ export default function Members() {
     status: 'active' as MemberStatus,
     joining_date: null as Date | null,
     plan_expiry_date: null as Date | null,
+    isPaid: true,
   });
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState<Date | null>(new Date());
@@ -416,6 +417,7 @@ Thank you for your prompt attention! 🙏`;
       status: member.status,
       joining_date: member.joining_date ? new Date(member.joining_date) : null,
       plan_expiry_date: member.plan_expiry_date ? new Date(member.plan_expiry_date) : null,
+      isPaid: Number(member.balance) === 0,
     });
     setIsEditOpen(true);
   };
@@ -433,6 +435,7 @@ Thank you for your prompt attention! 🙏`;
       status: editFormData.status,
       joining_date: editFormData.joining_date?.toISOString(),
       plan_expiry_date: editFormData.plan_expiry_date?.toISOString(),
+      balance: editFormData.isPaid ? 0 : (Number(selectedMember.balance) > 0 ? Number(selectedMember.balance) : Number(editFormData.monthly_fee)),
     });
 
     setIsEditOpen(false);
@@ -701,10 +704,10 @@ Thank you for your prompt attention! 🙏`;
                   className={`overflow-hidden ${expiryStatus?.status === 'expiring' ? 'border-amber-500' : expiryStatus?.status === 'expired' ? 'border-destructive' : ''}`}
                 >
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                      <div className="flex-1 w-full sm:w-auto min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium truncate">{member.name}</h3>
+                          <h3 className="font-medium truncate text-lg sm:text-base">{member.name}</h3>
                           <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
                             {member.status}
                           </Badge>
@@ -718,13 +721,13 @@ Thank you for your prompt attention! 🙏`;
                             >
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               {expiryStatus.status === 'expired'
-                                ? `Expired ${expiryStatus.days}d ago`
-                                : `Expires in ${expiryStatus.days}d`
+                                ? `Exp ${expiryStatus.days}d ago`
+                                : `Exp in ${expiryStatus.days}d`
                               }
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
+                        <div className="flex items-center gap-x-4 gap-y-2 mt-2 sm:mt-1 text-sm text-muted-foreground flex-wrap">
                           <span className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
                             {member.phone}
@@ -743,19 +746,21 @@ Thank you for your prompt attention! 🙏`;
                           )}
                         </div>
                       </div>
-                      <div className="text-right flex flex-col items-end gap-2">
-                        <div>
+
+                      <div className="w-full sm:w-auto flex flex-col items-end gap-3 sm:gap-2">
+                        <div className="w-full sm:w-auto flex justify-between sm:block text-right">
                           <p className="text-sm text-muted-foreground">Balance</p>
-                          <p className={`font-semibold ${Number(member.balance) > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                          <p className={`font-semibold text-lg sm:text-base ${Number(member.balance) > 0 ? 'text-destructive' : 'text-foreground'}`}>
                             {formatCurrency(Number(member.balance))}
                           </p>
                         </div>
-                        <div className="flex gap-1 flex-wrap justify-end">
+                        <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                           {Number(member.balance) > 0 && (
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => openPayment(member)}
+                              className="flex-1 sm:flex-none"
                             >
                               <CreditCard className="h-3 w-3 mr-1" />
                               Pay
@@ -765,7 +770,7 @@ Thank you for your prompt attention! 🙏`;
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-primary text-primary hover:bg-primary/10"
+                              className="border-primary text-primary hover:bg-primary/10 flex-1 sm:flex-none"
                               onClick={() => openRenewal(member)}
                             >
                               <RefreshCw className="h-3 w-3 mr-1" />
@@ -776,41 +781,39 @@ Thank you for your prompt attention! 🙏`;
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-amber-500 text-amber-600 hover:bg-amber-500/10"
+                              className="border-amber-500 text-amber-600 hover:bg-amber-500/10 flex-1 sm:flex-none"
                               onClick={() => handleSingleReminder(member)}
-                              title="Send WhatsApp Reminder"
+                              title="Send Reminder"
                             >
-                              <MessageCircle className="h-3 w-3 mr-1" />
-                              Remind
+                              <MessageCircle className="h-3 w-3" />
                             </Button>
                           )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => openEdit(member)}
-                            title="Edit member"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => openHistory(member)}
-                            title="Transaction history"
-                          >
-                            <History className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(member.id)}
-                            title="Delete member"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1 ml-auto">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => openEdit(member)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => openHistory(member)}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteId(member.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -981,20 +984,26 @@ Thank you for your prompt attention! 🙏`;
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select
-                  value={editFormData.status}
-                  onValueChange={(value: MemberStatus) => setEditFormData({ ...editFormData, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                <div className="space-y-0.5">
+                  <Label htmlFor="edit-paid-toggle" className="text-base">Payment Status</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {editFormData.isPaid ? 'Balance cleared' : 'Outstanding balance'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm ${!editFormData.isPaid ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                    Unpaid
+                  </span>
+                  <Switch
+                    id="edit-paid-toggle"
+                    checked={editFormData.isPaid}
+                    onCheckedChange={(checked) => setEditFormData({ ...editFormData, isPaid: checked })}
+                  />
+                  <span className={`text-sm ${editFormData.isPaid ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                    Paid
+                  </span>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

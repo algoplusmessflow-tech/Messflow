@@ -84,11 +84,11 @@ export function PettyCashWidget() {
             <p className="text-2xl font-bold">{formatAmount(currentBalance)}</p>
           )}
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               size="sm"
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onClick={() => setRefillOpen(true)}
             >
               <Plus className="h-3 w-3 mr-1" />
@@ -97,7 +97,7 @@ export function PettyCashWidget() {
             <Button
               size="sm"
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onClick={() => setExpenseOpen(true)}
             >
               <Minus className="h-3 w-3 mr-1" />

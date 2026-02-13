@@ -318,7 +318,9 @@ export default function Expenses() {
               )}
             </CardContent>
           </Card>
-          <PettyCashWidget />
+          <div className="col-span-2 md:col-span-1">
+            <PettyCashWidget />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
