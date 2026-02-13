@@ -13,6 +13,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { generateMenuPDF } from '@/lib/menu-pdf-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { MessageCircle, Save, Loader2, Plus, X, FileDown, Share2 } from 'lucide-react';
+import { ShareDialog } from '@/components/ShareDialog';
 import { toast } from 'sonner';
 
 export default function Menu() {
@@ -29,6 +30,8 @@ export default function Menu() {
   const [newOptionalDish, setNewOptionalDish] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareFile, setShareFile] = useState<{ blob: Blob; filename: string; message: string; whatsapp: string; title?: string } | null>(null);
 
   useEffect(() => {
     const dayMenu = getMenuForWeekDay(selectedWeek, selectedDay);
@@ -86,7 +89,7 @@ export default function Menu() {
         menuData,
         profile?.business_name || 'Mess Menu'
       );
-      
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -95,7 +98,7 @@ export default function Menu() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       toast.success('Menu PDF downloaded!');
     } catch (error) {
       toast.error('Failed to generate PDF');
@@ -113,34 +116,43 @@ export default function Menu() {
         menuData,
         profile?.business_name || 'Mess Menu'
       );
-      
-      // Upload PDF to storage for sharing
-      const fileName = `menu-week-${selectedWeek}-${Date.now()}.pdf`;
-      const { error: uploadError } = await supabase
-        .storage
-        .from('receipts')
-        .upload(fileName, blob, {
-          contentType: 'application/pdf',
-          upsert: true,
-        });
 
-      if (uploadError) {
-        throw new Error('Failed to upload PDF: ' + uploadError.message);
+      const fileName = `menu-week-${selectedWeek}-${Date.now()}.pdf`;
+      const message = `📋 *Week ${selectedWeek} Menu* from ${profile?.business_name || 'Our Mess'}\n\nHere is the menu for this week. Enjoy your meals! 🍽️`;
+
+      // Try native share first
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'application/pdf' })] })) {
+        const file = new File([blob], fileName, { type: 'application/pdf' });
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Week ${selectedWeek} Menu`,
+            text: message,
+          });
+          toast.success('Menu shared successfully!');
+          return;
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            // Fallback to dialog
+          } else {
+            return; // User cancelled
+          }
+        }
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('receipts')
-        .getPublicUrl(fileName);
+      // Fallback to Share Dialog
+      setShareFile({
+        blob,
+        filename: fileName,
+        message,
+        whatsapp: '', // No specific number for menu blast
+        title: `Share Menu Week ${selectedWeek}`
+      });
+      setIsShareDialogOpen(true);
 
-      // Create a shareable message with the PDF link
-      const message = `📋 *Week ${selectedWeek} Menu* from ${profile?.business_name || 'Our Mess'}\n\nDownload the complete menu PDF here:\n${publicUrl}\n\nEnjoy your meals! 🍽️`;
-      const encodedMessage = encodeURIComponent(message);
-      window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-      
-      toast.success('Menu PDF shared via WhatsApp!');
     } catch (error) {
       toast.error('Failed to generate PDF for sharing');
+      console.error(error);
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -252,7 +264,7 @@ export default function Menu() {
                         <p className="text-sm text-muted-foreground mb-3">
                           Add extra dishes available for this day
                         </p>
-                        
+
                         <div className="flex gap-2 mb-3">
                           <Input
                             placeholder="Add optional dish..."
@@ -300,6 +312,19 @@ export default function Menu() {
           </div>
         )}
       </div>
+
+      {/* Share Dialog */}
+      {shareFile && (
+        <ShareDialog
+          isOpen={isShareDialogOpen}
+          onClose={() => setIsShareDialogOpen(false)}
+          fileBlob={shareFile.blob}
+          fileName={shareFile.filename}
+          messageBody={shareFile.message}
+          whatsappNumber={shareFile.whatsapp}
+          title={shareFile.title}
+        />
+      )}
     </AppLayout>
   );
 }

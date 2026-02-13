@@ -16,7 +16,7 @@ export async function shareInvoiceViaWhatsApp(
   taxRate: number = 5,
   taxName: string = 'VAT',
   companyAddress?: string | null
-): Promise<void> {
+): Promise<Blob | void> {
   try {
     // Generate the PDF
     const pdfDoc = createInvoicePDF(
@@ -29,60 +29,48 @@ export async function shareInvoiceViaWhatsApp(
       invoiceNumber,
       companyAddress
     );
-    
+
     // Convert PDF to blob
     const pdfBlob = pdfDoc.output('blob');
-    
-    // Generate unique filename
-    const fileName = `invoices/${Date.now()}-${invoiceNumber}.pdf`;
-    
-    // Upload to receipts bucket (temporary)
-    const { error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(fileName, pdfBlob, {
-        contentType: 'application/pdf',
-        upsert: true,
-      });
+    const fileName = `invoice-${invoiceNumber}.pdf`;
 
-    if (uploadError) {
-      throw new Error('Failed to upload invoice: ' + uploadError.message);
+    // Check if Web Share API is supported and can share files
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName, { type: 'application/pdf' })] })) {
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      // Format phone number for WhatsApp
+      const cleanPhone = memberPhone.replace(/[\s-]/g, '');
+      const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) :
+        cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
+          cleanPhone.startsWith('971') ? cleanPhone :
+            `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
+
+      const message = `🧾 *Invoice ${invoiceNumber}* - ${businessName}\nAmount: AED ${amount.toFixed(2)}`;
+
+      try {
+        await navigator.share({
+          files: [file],
+          title: `Invoice ${invoiceNumber}`,
+          text: message,
+        });
+        toast.success('Shared successfully!');
+        return; // Shared natively, no need for dialog
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('Share failed:', error);
+          // Fallback to dialog if share fails (but not if cancelled)
+        } else {
+          return; // User cancelled share
+        }
+      }
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('receipts')
-      .getPublicUrl(fileName);
+    // If native share not supported or failed, return blob for Share Dialog
+    return pdfBlob;
 
-    // Format phone number for WhatsApp
-    const cleanPhone = memberPhone.replace(/[\s-]/g, '');
-    const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) : 
-                          cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
-                          cleanPhone.startsWith('971') ? cleanPhone :
-                          `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
-
-    // Create WhatsApp message with PDF attachment
-    const message = `🧾 *Invoice ${invoiceNumber}*
-
-*${businessName}*
-
-Dear ${memberName},
-
-Your invoice for AED ${amount.toFixed(2)} is ready.
-
-📎 Download your invoice here:
-${publicUrl}
-
-Thank you for your business! 🙏`;
-
-    // Open WhatsApp with the PDF URL
-    const whatsappUrl = `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-    
-    toast.success('Opening WhatsApp with invoice link...');
-    
   } catch (error: any) {
-    console.error('Failed to share invoice:', error);
-    toast.error('Failed to share invoice: ' + error.message);
+    console.error('Failed to generate invoice:', error);
+    toast.error('Failed to generate invoice: ' + error.message);
     throw error;
   }
 }
@@ -130,7 +118,7 @@ export function createInvoicePDF(
   doc.text(`Date: ${today.toLocaleDateString()}`, pageWidth - margin - 60, 53);
 
   let yPos = companyAddress ? 50 : 40;
-  
+
   if (taxTrn) {
     doc.text(`TRN: ${taxTrn}`, margin, yPos);
     yPos += 8;

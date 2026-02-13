@@ -46,6 +46,7 @@ import { Plus, Phone, Loader2, CreditCard, AlertTriangle, FileText, MessageCircl
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { UpgradePlanModal } from '@/components/UpgradePlanModal';
+import { ShareDialog } from '@/components/ShareDialog';
 import { MemberImportModal } from '@/components/MemberImportModal';
 import { MemberRenewalModal } from '@/components/MemberRenewalModal';
 import { TransactionHistoryModal } from '@/components/TransactionHistoryModal';
@@ -70,6 +71,10 @@ export default function Members() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Sharing state
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareFile, setShareFile] = useState<{ blob: Blob; filename: string; message: string; whatsapp: string; title?: string } | null>(null);
   const [lastPaymentInfo, setLastPaymentInfo] = useState<{ memberName: string; amount: number; phone: string } | null>(null);
   const [selectedMember, setSelectedMember] = useState<typeof members[0] | null>(null);
   const [editFormData, setEditFormData] = useState({
@@ -307,7 +312,7 @@ Thank you for your business! 🙏`;
     try {
       const invoiceNumber = getNextInvoiceNumber();
 
-      await shareInvoiceViaWhatsApp(
+      const result = await shareInvoiceViaWhatsApp(
         lastPaymentInfo.memberName,
         lastPaymentInfo.phone,
         lastPaymentInfo.amount,
@@ -321,6 +326,25 @@ Thank you for your business! 🙏`;
 
       // Increment invoice number for next time
       await incrementInvoiceNumber.mutateAsync();
+
+      if (result instanceof Blob) {
+        // Fallback to Share Dialog
+        const cleanPhone = lastPaymentInfo.phone.replace(/[\s-]/g, '');
+        const phoneWithCode = cleanPhone.startsWith('+') ? cleanPhone.slice(1) :
+          cleanPhone.startsWith('00') ? cleanPhone.slice(2) :
+            cleanPhone.startsWith('971') ? cleanPhone :
+              `971${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
+
+        const message = `🧾 *Invoice ${invoiceNumber}* - ${profile.business_name}\nAmount: AED ${lastPaymentInfo.amount.toFixed(2)}`;
+
+        setShareFile({
+          blob: result,
+          filename: `invoice-${invoiceNumber}.pdf`,
+          message,
+          whatsapp: phoneWithCode
+        });
+        setIsShareDialogOpen(true);
+      }
 
       setIsInvoiceDialogOpen(false);
     } catch (error) {
@@ -1117,13 +1141,27 @@ Thank you for your prompt attention! 🙏`;
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleBulkReminder}>
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Send Reminders
-              </AlertDialogAction>
+              {unpaidMembers.length > 0 && (
+                <AlertDialogAction onClick={handleBulkReminder}>
+                  Send Reminders
+                </AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Share Dialog */}
+        {shareFile && (
+          <ShareDialog
+            isOpen={isShareDialogOpen}
+            onClose={() => setIsShareDialogOpen(false)}
+            fileBlob={shareFile.blob}
+            fileName={shareFile.filename}
+            messageBody={shareFile.message}
+            whatsappNumber={shareFile.whatsapp}
+            title="Share Invoice"
+          />
+        )}
 
         {/* Invoice Actions Dialog */}
         <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
